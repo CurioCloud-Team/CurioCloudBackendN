@@ -1,0 +1,26 @@
+# CurioCloud Backend Dependencies
+# FastAPI框架和相关组件
+fastapi==0.110.0
+uvicorn[standard]==0.27.0
+
+# 数据库相关
+SQLAlchemy==2.0.27
+PyMySQL==1.1.0
+alembic==1.13.1
+
+# 认证和安全
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
+
+# 数据验证
+pydantic[email]==2.6.1
+pydantic-settings==2.1.0
+
+# 环境变量
+python-dotenv==1.0.0
+
+# 开发和测试
+pytest==8.0.0
+pytest-asyncio==0.23.3
+httpx==0.26.0
