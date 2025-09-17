@@ -103,6 +103,42 @@ class AuthResponse(BaseModel):
     message: str = Field(default="认证成功", description="响应消息")
 
 
+class UserProfileUpdate(BaseModel):
+    """用户资料更新请求模式"""
+    full_name: Optional[str] = Field(None, max_length=100, description="用户全名")
+    email: Optional[EmailStr] = Field(None, description="邮箱地址")
+    
+    @validator('email')
+    def validate_email_if_provided(cls, v):
+        """如果提供了邮箱，验证邮箱格式"""
+        if v is not None and v.strip() == "":
+            raise ValueError('邮箱不能为空字符串')
+        return v
+    
+    @validator('full_name')
+    def validate_full_name_if_provided(cls, v):
+        """如果提供了全名，验证全名格式"""
+        if v is not None and v.strip() == "":
+            raise ValueError('用户全名不能为空字符串')
+        return v
+
+
+class UserProfileResponse(BaseModel):
+    """用户资料响应模式"""
+    id: int
+    username: str
+    email: str
+    full_name: Optional[str]
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        """Pydantic配置"""
+        from_attributes = True
+
+
 class MessageResponse(BaseModel):
     """通用消息响应模式"""
     message: str = Field(..., description="响应消息")

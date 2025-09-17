@@ -9,7 +9,10 @@ from fastapi import HTTPException, status
 from typing import Optional
 
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, AuthResponse, Token
+from app.schemas.user import (
+    UserCreate, UserLogin, UserResponse, AuthResponse, Token,
+    UserProfileUpdate, UserProfileResponse
+)
 from app.utils.security import hash_password, verify_password
 from app.utils.jwt import create_access_token, get_token_expire_time
 
@@ -191,3 +194,97 @@ class AuthService:
             用户对象或None
         """
         return self.db.query(User).filter(User.id == user_id).first()
+    
+    def get_user_profile(self, user_id: int) -> UserProfileResponse:
+        """
+        获取用户资料
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            用户资料响应
+            
+        Raises:
+            HTTPException: 用户不存在时抛出异常
+        """
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+        
+        return UserProfileResponse.from_orm(user)
+    
+    def update_user_profile(self, user_id: int, profile_data: UserProfileUpdate) -> UserProfileResponse:
+        """
+        更新用户资料
+        
+        Args:
+            user_id: 用户ID
+            profile_data: 用户资料更新数据
+            
+        Returns:
+            更新后的用户资料
+            
+        Raises:
+            HTTPException: 更新失败时抛出异常
+        """
+        try:
+            # 获取用户
+            user = self.get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="用户不存在"
+                )
+            
+            # 检查邮箱是否已被其他用户使用
+            if profile_data.email and profile_data.email != user.email:
+                existing_user = self.db.query(User).filter(
+                    User.email == profile_data.email,
+                    User.id != user_id
+                ).first()
+                
+                if existing_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="邮箱已被其他用户使用"
+                    )
+            
+            # 更新用户信息
+            update_data = profile_data.dict(exclude_unset=True)
+            for field, value in update_data.items():
+                if hasattr(user, field):
+                    setattr(user, field, value)
+            
+            # 保存更改
+            self.db.commit()
+            self.db.refresh(user)
+            
+            return UserProfileResponse.from_orm(user)
+            
+        except HTTPException:
+            # 重新抛出HTTP异常
+            self.db.rollback()
+            raise
+        except IntegrityError as e:
+            self.db.rollback()
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            if "email" in error_msg.lower():
+                detail = "邮箱已被其他用户使用"
+            else:
+                detail = "用户信息更新失败，请检查输入数据"
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail
+            )
+        except Exception as e:
+            self.db.rollback()
+            print(f"Unexpected error during profile update: {type(e).__name__}: {e}")  # 调试信息
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="更新用户资料时发生错误"
+            )

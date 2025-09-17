@@ -8,12 +8,14 @@
 ## 功能特性
 
 - ✅ 用户注册与登录
+- ✅ 用户资料管理（获取/更新）
 - ✅ JWT令牌认证
 - ✅ 密码安全加密
 - ✅ 数据验证和错误处理
 - ✅ MySQL数据库集成
 - ✅ RESTful API设计
 - ✅ 完整的文档和注释
+- ✅ 完善的测试套件
 
 ## 技术栈
 
@@ -31,6 +33,8 @@ CurioCloudBackendN/
 │   ├── core/              # 核心配置
 │   │   ├── config.py      # 应用配置
 │   │   └── database.py    # 数据库连接
+│   ├── dependencies/      # 依赖注入
+│   │   └── auth.py        # 认证依赖
 │   ├── models/            # 数据库模型
 │   │   └── user.py        # 用户模型
 │   ├── schemas/           # 数据验证模式
@@ -38,10 +42,17 @@ CurioCloudBackendN/
 │   ├── services/          # 业务逻辑
 │   │   └── auth_service.py # 认证服务
 │   ├── routers/           # API路由
-│   │   └── auth.py        # 认证路由
+│   │   ├── auth.py        # 认证路由
+│   │   └── user.py        # 用户管理路由
 │   └── utils/             # 工具函数
 │       ├── security.py    # 密码工具
 │       └── jwt.py         # JWT工具
+├── tests/                 # 测试套件
+│   ├── conftest.py        # 测试配置
+│   ├── test_auth.py       # 认证API测试
+│   ├── test_models.py     # 数据模型测试
+│   ├── test_services.py   # 业务逻辑测试
+│   └── test_user_profile.py # 用户资料测试
 ├── main.py                # 应用入口
 ├── requirements.txt       # 依赖包
 └── .env                   # 环境变量
@@ -172,6 +183,69 @@ Content-Type: application/json
         "expires_in": 1800
     },
     "message": "登录成功"
+}
+```
+
+### 获取用户资料
+
+```http
+GET /api/user/profile
+Authorization: Bearer {access_token}
+```
+
+**响应示例:**
+```json
+{
+    "id": 1,
+    "username": "testuser",
+    "email": "test@example.com",
+    "full_name": "测试用户",
+    "is_active": true,
+    "is_verified": false,
+    "created_at": "2024-01-01T12:00:00Z",
+    "updated_at": "2024-01-01T12:00:00Z"
+}
+```
+
+### 更新用户资料
+
+```http
+PUT /api/user/profile
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+    "full_name": "更新后的用户名",  // 可选
+    "email": "new@example.com"     // 可选
+}
+```
+
+**响应示例:**
+```json
+{
+    "id": 1,
+    "username": "testuser",
+    "email": "new@example.com",
+    "full_name": "更新后的用户名",
+    "is_active": true,
+    "is_verified": false,
+    "created_at": "2024-01-01T12:00:00Z",
+    "updated_at": "2024-01-01T12:05:00Z"
+}
+```
+
+### 获取用户状态
+
+```http
+GET /api/user/profile/status
+Authorization: Bearer {access_token}
+```
+
+**响应示例:**
+```json
+{
+    "message": "用户 testuser: 账户已激活, 邮箱未验证",
+    "success": true
 }
 ```
 

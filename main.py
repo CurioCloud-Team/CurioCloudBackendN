@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import create_tables
 from app.routers import auth_router
+from app.routers.user import router as user_router
 
 
 @asynccontextmanager
@@ -56,6 +57,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(auth_router)
+app.include_router(user_router)
 
 
 @app.get("/", tags=["根路径"])

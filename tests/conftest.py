@@ -79,3 +79,32 @@ def sample_login_data():
         "username": "testuser",
         "password": "Test123!@#"
     }
+
+
+@pytest.fixture
+def auth_headers(client: TestClient, sample_user_data):
+    """获取认证头部"""
+    # 注册用户
+    register_response = client.post("/api/auth/register", json=sample_user_data)
+    assert register_response.status_code == 201  # 注册接口返回201
+    
+    # 获取令牌
+    token = register_response.json()["token"]["access_token"]
+    
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def authenticated_user(client: TestClient, sample_user_data):
+    """创建已认证的用户并返回用户信息和令牌"""
+    # 注册用户
+    register_response = client.post("/api/auth/register", json=sample_user_data)
+    assert register_response.status_code == 201  # 注册接口返回201
+    
+    response_data = register_response.json()
+    
+    return {
+        "user": response_data["user"],
+        "token": response_data["token"]["access_token"],
+        "headers": {"Authorization": f"Bearer {response_data['token']['access_token']}"}
+    }
