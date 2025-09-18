@@ -16,6 +16,11 @@
 - ✅ RESTful API设计
 - ✅ 完整的文档和注释
 - ✅ 完善的测试套件
+- 🆕 **对话式教学设计自动化模块**
+  - 智能对话流程引导
+  - AI生成教学计划
+  - OpenRouter集成
+  - 完整的教案管理CRUD
 
 ## 技术栈
 
@@ -27,8 +32,6 @@
 
 ## 项目结构
 
-```
-CurioCloudBackendN/
 ├── app/                    # 应用程序包
 │   ├── core/              # 核心配置
 │   │   ├── config.py      # 应用配置
@@ -36,27 +39,35 @@ CurioCloudBackendN/
 │   ├── dependencies/      # 依赖注入
 │   │   └── auth.py        # 认证依赖
 │   ├── models/            # 数据库模型
-│   │   └── user.py        # 用户模型
+│   │   ├── user.py        # 用户模型
+│   │   ├── lesson_creation_session.py    # 教学会话模型
+│   │   ├── lesson_plan.py               # 教学计划模型
+│   │   └── lesson_plan_activity.py      # 教学活动模型
 │   ├── schemas/           # 数据验证模式
 │   │   └── user.py        # 用户相关schema
 │   ├── services/          # 业务逻辑
-│   │   └── auth_service.py # 认证服务
+│   │   ├── auth_service.py # 认证服务
+│   │   └── teaching_service.py          # 教学服务
 │   ├── routers/           # API路由
 │   │   ├── auth.py        # 认证路由
-│   │   └── user.py        # 用户管理路由
-│   └── utils/             # 工具函数
-│       ├── security.py    # 密码工具
-│       └── jwt.py         # JWT工具
+│   │   ├── user.py        # 用户管理路由
+│   │   └── teaching.py    # 教学模块路由
+│   ├── utils/             # 工具函数
+│   │   ├── security.py    # 密码工具
+│   │   └── jwt.py         # JWT工具
+│   ├── conversation_flow.py              # 对话流程配置
+│   └── ai_service.py                     # AI服务集成
 ├── tests/                 # 测试套件
 │   ├── conftest.py        # 测试配置
 │   ├── test_auth.py       # 认证API测试
 │   ├── test_models.py     # 数据模型测试
 │   ├── test_services.py   # 业务逻辑测试
-│   └── test_user_profile.py # 用户资料测试
+│   ├── test_user_profile.py # 用户资料测试
+│   └── test_teaching.py   # 教学模块测试
 ├── main.py                # 应用入口
 ├── requirements.txt       # 依赖包
+├── demo_teaching_module.py # 教学模块演示
 └── .env                   # 环境变量
-```
 
 ## 快速开始
 
@@ -247,6 +258,177 @@ Authorization: Bearer {access_token}
     "message": "用户 testuser: 账户已激活, 邮箱未验证",
     "success": true
 }
+```
+
+## 🆕 对话式教学设计模块
+
+### 功能概述
+
+对话式教学设计自动化模块通过智能问答流程，引导用户逐步提供教学设计所需信息，最终由AI生成完整的教学计划。
+
+#### 核心特性
+- 🤖 **智能对话流程**: 引导式问题设计，逐步收集教学信息
+- 🎯 **AI生成教案**: 集成OpenRouter API，自动生成结构化教学计划
+- 📚 **完整CRUD操作**: 教案的创建、读取、更新、删除
+- 🔄 **状态管理**: 会话状态跟踪，确保流程完整性
+- 🛡️ **权限控制**: 基于JWT的用户认证和授权
+
+### 对话流程
+
+1. **学科选择** → 2. **年级选择** → 3. **课题输入** → 4. **时长设置** → 5. **AI生成教案**
+
+### API接口
+
+#### 开始教学设计对话
+
+```http
+POST /api/teaching/conversational/start
+Authorization: Bearer {access_token}
+```
+
+**响应示例:**
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "question_card": {
+        "step_key": "ask_subject",
+        "question": "您好！我们来一起准备一堂新课。首先，这堂课是关于哪个学科的？",
+        "options": ["语文", "数学", "英语", "物理", "历史", "生物"],
+        "allows_free_text": true
+    }
+}
+```
+
+#### 提交回答并获取下一步
+
+```http
+POST /api/teaching/conversational/next
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "answer": "生物"
+}
+```
+
+**中间步骤响应:**
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "question_card": {
+        "step_key": "ask_grade",
+        "question": "好的，那么这堂课是针对哪个年级的学生？",
+        "options": ["初中一年级", "初中二年级", "初中三年级"],
+        "allows_free_text": true
+    }
+}
+```
+
+**完成响应:**
+```json
+{
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "completed",
+    "lesson_plan": {
+        "id": 1,
+        "title": "探秘绿色工厂——光合作用",
+        "subject": "生物",
+        "grade": "初中二年级",
+        "teaching_objective": "1. 理解光合作用的基本概念和过程\n2. 掌握光合作用的条件和产物",
+        "teaching_outline": "本课程将带领学生探索植物如何将光能转化为化学能...",
+        "activities": [
+            {
+                "activity_name": "课堂导入",
+                "description": "通过观察绿色植物引出生长之谜",
+                "duration": 5,
+                "order_index": 1
+            }
+        ],
+        "created_at": "2024-01-01T12:00:00Z"
+    }
+}
+```
+
+#### 获取教案列表
+
+```http
+GET /api/teaching/lesson-plans
+Authorization: Bearer {access_token}
+```
+
+#### 获取单个教案
+
+```http
+GET /api/teaching/lesson-plans/{plan_id}
+Authorization: Bearer {access_token}
+```
+
+#### 删除教案
+
+```http
+DELETE /api/teaching/lesson-plans/{plan_id}
+Authorization: Bearer {access_token}
+```
+
+### 数据库表结构
+
+#### lesson_creation_sessions 表
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| session_id | VARCHAR(36) | PRIMARY KEY | 会话UUID |
+| user_id | INT | FOREIGN KEY, NOT NULL | 用户ID |
+| status | ENUM | DEFAULT 'in_progress' | 会话状态 |
+| current_step | VARCHAR(50) | NULL | 当前步骤 |
+| collected_data | JSON | DEFAULT {} | 收集的数据 |
+| created_at | DATETIME | DEFAULT NOW() | 创建时间 |
+| updated_at | DATETIME | DEFAULT NOW() ON UPDATE | 更新时间 |
+
+#### lesson_plans 表
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | 教案ID |
+| user_id | INT | FOREIGN KEY, NOT NULL | 用户ID |
+| title | VARCHAR(255) | NOT NULL | 教案标题 |
+| subject | VARCHAR(100) | NOT NULL | 学科 |
+| grade | VARCHAR(100) | NOT NULL | 年级 |
+| teaching_objective | TEXT | NULL | 教学目标 |
+| teaching_outline | TEXT | NULL | 教学大纲 |
+| created_at | DATETIME | DEFAULT NOW() | 创建时间 |
+| updated_at | DATETIME | DEFAULT NOW() ON UPDATE | 更新时间 |
+
+#### lesson_plan_activities 表
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | 活动ID |
+| lesson_plan_id | INT | FOREIGN KEY, NOT NULL | 教案ID |
+| activity_name | VARCHAR(255) | NOT NULL | 活动名称 |
+| description | TEXT | NULL | 活动描述 |
+| duration | INT | NULL | 活动时长(分钟) |
+| order_index | INT | NOT NULL | 活动顺序 |
+
+### 配置要求
+
+在 `.env` 文件中添加以下配置：
+
+```env
+# OpenRouter LLM配置
+openrouter_api_key=sk-or-v1-xxxxxxxxxxxxx
+openrouter_base_url=https://openrouter.ai/api/v1
+openrouter_default_model=google/gemini-2.5-flash
+llm_max_retries=3
+llm_timeout_seconds=120
+```
+
+### 演示脚本
+
+运行演示脚本来了解模块功能：
+
+```bash
+python demo_teaching_module.py
 ```
 
 ## 密码要求

@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
     
+    # OpenRouter LLM配置
+    openrouter_api_key: str
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_default_model: str = "google/gemini-2.5-flash"
+    llm_max_retries: int = 3
+    llm_timeout_seconds: int = 120
+    
     class Config:
         """Pydantic配置"""
         env_file = ".env"
