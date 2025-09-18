@@ -7,6 +7,7 @@ import uuid
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import LessonCreationSession, LessonPlan, LessonPlanActivity, SessionStatus
 from app.services.ai_service import AIService
@@ -89,6 +90,9 @@ class TeachingService:
             # 保存用户回答
             key_to_save = current_step_config['key_to_save']
             session.collected_data[key_to_save] = answer
+
+            # 标记 collected_data 字段已被修改，确保数据库更新
+            flag_modified(session, "collected_data")
 
             # 获取下一步
             next_step = get_next_step(session.current_step)
