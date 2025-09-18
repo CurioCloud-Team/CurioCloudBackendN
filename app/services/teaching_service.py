@@ -61,7 +61,7 @@ class TeachingService:
             print(f"开始对话失败: {type(e).__name__}: {e}")
             raise
 
-    def process_answer(self, session_id: str, answer: str) -> Dict[str, Any]:
+    async def process_answer(self, session_id: str, answer: str) -> Dict[str, Any]:
         """
         处理用户回答并返回下一步或最终结果
 
@@ -98,9 +98,8 @@ class TeachingService:
                 session.status = SessionStatus.processing
                 self.db.commit()
 
-                # 这里应该使用同步方式调用AI服务，或者改为异步
-                # 暂时使用同步方式，实际项目中应该使用任务队列
-                lesson_plan_data = self._generate_lesson_plan_sync(session.collected_data)
+                # 直接调用异步AI服务
+                lesson_plan_data = await self.ai_service.generate_lesson_plan(session.collected_data)
 
                 if lesson_plan_data:
                     # 保存教案到数据库
@@ -212,24 +211,6 @@ class TeachingService:
             "options": config['options'],
             "allows_free_text": config['allows_free_text']
         }
-
-    def _generate_lesson_plan_sync(self, collected_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        同步生成教学计划（用于简化实现）
-
-        Args:
-            collected_data: 收集的用户数据
-
-        Returns:
-            生成的教学计划数据
-        """
-        try:
-            # 这里暂时使用同步方式，实际项目中应该使用asyncio.run()或任务队列
-            import asyncio
-            return asyncio.run(self.ai_service.generate_lesson_plan(collected_data))
-        except Exception as e:
-            print(f"AI生成教案失败: {type(e).__name__}: {e}")
-            return None
 
     def _save_lesson_plan(self, user_id: int, lesson_plan_data: Dict[str, Any]) -> LessonPlan:
         """

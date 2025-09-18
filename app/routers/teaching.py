@@ -158,7 +158,7 @@ async def process_answer(
             )
 
         teaching_service = TeachingService(db)
-        result = teaching_service.process_answer(session_id, answer)
+        result = await teaching_service.process_answer(session_id, answer)
 
         return result
 

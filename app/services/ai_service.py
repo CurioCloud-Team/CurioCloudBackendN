@@ -71,11 +71,21 @@ class AIService:
 
                         # 尝试解析JSON响应
                         try:
-                            lesson_plan = json.loads(content.strip())
+                            # 清理响应内容，移除可能的markdown代码块标记
+                            content = content.strip()
+                            if content.startswith('```json'):
+                                content = content[7:]  # 移除 ```json
+                            if content.startswith('```'):
+                                content = content[3:]  # 移除 ```
+                            if content.endswith('```'):
+                                content = content[:-3]  # 移除结尾的 ```
+                            content = content.strip()  # 再次清理空白字符
+
+                            lesson_plan = json.loads(content)
                             return self._validate_lesson_plan(lesson_plan)
                         except json.JSONDecodeError as e:
                             print(f"JSON解析失败: {e}")
-                            print(f"AI响应内容: {content}")
+                            print(f"清理后的AI响应内容: {content[:200]}...")
                             continue
                     else:
                         print(f"API请求失败 (尝试 {attempt + 1}/{self.max_retries}): {response.status_code}")
