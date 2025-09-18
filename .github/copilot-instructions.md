@@ -116,4 +116,24 @@ JWT_SECRET_KEY=your_secret_key
 - **Authentication**: Use appropriate dependency (`get_current_user` vs `get_current_active_user`)
 - **Error handling**: Follow the established try/catch pattern with proper DB rollback
 
+## AI Teaching Module
+
+### Conversational Flow
+- State machine defined in `app/conversation_flow.py`
+- Steps: ask_subject → ask_grade → ask_topic → ask_duration → finalize
+- Sessions stored in `lesson_creation_sessions` table
+- AI generation via OpenRouter API with structured prompts
+
+### AI Service Integration
+- `AIService` class handles OpenRouter API calls
+- Generates structured lesson plans with activities, objectives, outlines
+- Validates AI responses and handles retries
+- Uses Gemini 2.5 Flash model by default
+
+### Teaching Service Patterns
+- Async processing for AI generation
+- Session state management with status tracking
+- Lesson plan CRUD with activity relationships
+- Proper error handling for AI failures
+
 Focus on maintaining the clean separation between routers (HTTP), services (business logic), and models (data), while ensuring comprehensive error handling and testing coverage.
