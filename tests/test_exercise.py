@@ -117,4 +117,45 @@ def test_generate_fill_in_the_blank_questions(
     assert question_in_db.answer == "6O2"
     assert len(question_in_db.choices) == 0
 
+def test_generate_short_answer_questions(
+    client: TestClient,
+    db: Session,
+    authenticated_user: dict,
+    test_lesson_plan: LessonPlan,
+    mocker
+):
+    """测试生成简答题的API"""
+    # Mock the AI service call
+    mock_response = [
+        {
+            "content": "请简述光合作用的过程。",
+            "answer": "光合作用分为光反应和暗反应两个阶段。光反应在叶绿体类囊体膜上进行，将光能转化为化学能；暗反应在叶绿体基质中进行，利用光反应产生的ATP和NADPH将二氧化碳固定成糖类。"
+        }
+    ]
+    mocker.patch(
+        "app.services.ai_service.AIService.generate_short_answer_questions",
+        return_value=mock_response
+    )
+
+    headers = authenticated_user['headers']
+    response = client.post(
+        f"/api/exercises/lesson-plan/{test_lesson_plan.id}/generate-short-answer",
+        headers=headers,
+        json={"num_questions": 1, "difficulty": "hard"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["content"] == "请简述光合作用的过程。"
+    assert "光合作用分为光反应和暗反应" in data[0]["answer"]
+    assert len(data[0]["choices"]) == 0
+
+    # 验证数据库中是否已保存
+    question_in_db = db.query(Question).filter(Question.content == "请简述光合作用的过程。").first()
+    assert question_in_db is not None
+    assert question_in_db.lesson_plan_id == test_lesson_plan.id
+    assert "光反应" in question_in_db.answer
+    assert len(question_in_db.choices) == 0
+
 

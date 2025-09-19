@@ -128,3 +128,54 @@ class ExerciseService:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"保存题目时出错: {e}")
+
+    async def generate_and_save_saq(
+        self, lesson_plan_id: int, num_questions: int, difficulty: str
+    ) -> list[Question]:
+        """
+        为指定的教案生成并保存简答题
+        """
+        lesson_plan = self.db.query(LessonPlan).filter(LessonPlan.id == lesson_plan_id).first()
+        if not lesson_plan:
+            raise HTTPException(status_code=404, detail="未找到指定的教案")
+
+        content = f"标题: {lesson_plan.title}\n教学目标: {lesson_plan.teaching_objective}\n教学大纲: {lesson_plan.teaching_outline}"
+
+        generated_questions = await self.ai_service.generate_short_answer_questions(
+            content=content,
+            num_questions=num_questions,
+            difficulty=difficulty
+        )
+
+        if not generated_questions:
+            raise HTTPException(status_code=500, detail="AI服务未能生成题目")
+
+        saved_questions = []
+        try:
+            for q_data in generated_questions:
+                question_create = QuestionCreate(
+                    lesson_plan_id=lesson_plan_id,
+                    question_type=QuestionType.SHORT_ANSWER,
+                    difficulty=DifficultyLevel(difficulty),
+                    content=q_data["content"],
+                    answer=q_data.get("answer"),
+                    choices=[]  # 简答题没有选项
+                )
+
+                db_question = Question(
+                    lesson_plan_id=question_create.lesson_plan_id,
+                    question_type=question_create.question_type,
+                    difficulty=question_create.difficulty,
+                    content=question_create.content,
+                    answer=question_create.answer
+                )
+                self.db.add(db_question)
+                saved_questions.append(db_question)
+
+            self.db.commit()
+            for q in saved_questions:
+                self.db.refresh(q)
+            return saved_questions
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"保存题目时出错: {e}")

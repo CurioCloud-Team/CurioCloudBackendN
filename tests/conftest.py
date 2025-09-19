@@ -99,16 +99,16 @@ def authenticated_user(client: TestClient, test_user_data, db: Session):
     """创建已认证的用户并返回用户信息和令牌"""
     from app.models.user import User
     from app.services.auth_service import AuthService
-    from app.schemas.user import UserCreate
+    from app.schemas.user import UserCreate, UserResponse
 
     # 确保用户在数据库中
-    user = db.query(User).filter(User.username == test_user_data["username"]).first()
-    if not user:
+    db_user = db.query(User).filter(User.username == test_user_data["username"]).first()
+    if not db_user:
         auth_service = AuthService(db)
         user_create = UserCreate(**test_user_data)
-        auth_response = auth_service.register_user(user_data=user_create)
-        user = auth_response.user
-    
+        auth_service.register_user(user_data=user_create)
+        db_user = db.query(User).filter(User.username == test_user_data["username"]).first()
+
     # 登录获取token
     login_response = client.post("/api/auth/login", json={
         "username": test_user_data["username"],
@@ -119,10 +119,12 @@ def authenticated_user(client: TestClient, test_user_data, db: Session):
     token_data = login_response.json()["token"]
     
     # 从数据库获取最新的用户信息
-    db.refresh(user)
+    db.refresh(db_user)
+
+    user_response = UserResponse.from_orm(db_user)
 
     return {
-        "user": user,
+        "user": user_response.dict(),
         "token": token_data["access_token"],
         "headers": {"Authorization": f"Bearer {token_data['access_token']}"}
     }

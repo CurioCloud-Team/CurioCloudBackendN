@@ -61,3 +61,25 @@ async def generate_fill_in_the_blank_questions(
         difficulty=request.difficulty.value,
     )
     return questions
+
+class GenerateSAQRequest(BaseModel):
+    num_questions: int = 5
+    difficulty: DifficultyLevel = DifficultyLevel.MEDIUM
+
+@router.post("/lesson-plan/{plan_id}/generate-short-answer", response_model=List[QuestionSchema])
+async def generate_short_answer_questions(
+    plan_id: int,
+    request: GenerateSAQRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    为指定的教案生成简答题
+    """
+    service = ExerciseService(db)
+    questions = await service.generate_and_save_saq(
+        lesson_plan_id=plan_id,
+        num_questions=request.num_questions,
+        difficulty=request.difficulty.value,
+    )
+    return questions
