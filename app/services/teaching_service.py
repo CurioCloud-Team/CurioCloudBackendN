@@ -107,7 +107,7 @@ class TeachingService:
 
                 if lesson_plan_data:
                     # 保存教案到数据库
-                    lesson_plan = self._save_lesson_plan(session.user_id, lesson_plan_data)
+                    lesson_plan = self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
                     session.status = SessionStatus.completed
                     self.db.commit()
 
@@ -216,13 +216,14 @@ class TeachingService:
             "allows_free_text": config['allows_free_text']
         }
 
-    def _save_lesson_plan(self, user_id: int, lesson_plan_data: Dict[str, Any]) -> LessonPlan:
+    def _save_lesson_plan(self, user_id: int, collected_data: Dict[str, Any], lesson_plan_data: Dict[str, Any]) -> LessonPlan:
         """
         保存教学计划到数据库
 
         Args:
             user_id: 用户ID
-            lesson_plan_data: 教学计划数据
+            collected_data: 对话过程中收集的用户数据
+            lesson_plan_data: AI服务生成的教学计划核心数据
 
         Returns:
             保存的LessonPlan对象
@@ -232,8 +233,8 @@ class TeachingService:
             lesson_plan = LessonPlan(
                 user_id=user_id,
                 title=lesson_plan_data['title'],
-                subject=lesson_plan_data.get('subject', ''),
-                grade=lesson_plan_data.get('grade', ''),
+                subject=collected_data.get('subject', ''),
+                grade=collected_data.get('grade', ''),
                 teaching_objective='\n'.join(lesson_plan_data['learning_objectives']),
                 teaching_outline=lesson_plan_data['teaching_outline']
             )
