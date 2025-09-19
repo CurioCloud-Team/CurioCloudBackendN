@@ -1,12 +1,14 @@
 """
 AI服务模块
 
-提供与OpenRouter API的集成，用于生成教学计划
+提供与OpenRouter API的集成，用于生成教学计划和练习题
 """
 import json
 import httpx
 from typing import Dict, Any, Optional
+
 from app.core.config import settings
+from app.prompts.exercise_prompts import get_multiple_choice_prompt
 
 
 class AIService:
@@ -18,6 +20,56 @@ class AIService:
         self.default_model = settings.openrouter_default_model
         self.max_retries = settings.llm_max_retries
         self.timeout = settings.llm_timeout_seconds
+
+    async def _make_api_call(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        向OpenRouter API发出请求并处理通用逻辑
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://curio-cloud-backend.com",
+            "X-Title": "CurioCloud Teaching Assistant"
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(
+                        f"{self.base_url}/chat/completions",
+                        json=payload,
+                        headers=headers
+                    )
+
+                    if response.status_code == 200:
+                        return response.json()
+                    else:
+                        print(f"API请求失败 (尝试 {attempt + 1}/{self.max_retries}): {response.status_code}")
+                        print(f"响应内容: {response.text}")
+                        continue
+            except Exception as e:
+                print(f"AI服务请求异常 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
+                continue
+        return None
+
+    def _clean_and_parse_json(self, content: str) -> Optional[Any]:
+        """
+        清理并解析AI返回的JSON字符串
+        """
+        try:
+            content = content.strip()
+            if content.startswith('```json'):
+                content = content[7:]
+            if content.startswith('```'):
+                content = content[3:]
+            if content.endswith('```'):
+                content = content[:-3]
+            content = content.strip()
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"JSON解析失败: {e}")
+            print(f"清理后的AI响应内容: {content[:200]}...")
+            return None
 
     async def generate_lesson_plan(self, lesson_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -36,66 +88,47 @@ class AIService:
             生成的教学计划字典，如果失败返回None
         """
         prompt = self._build_prompt(lesson_data)
-
         payload = {
             "model": self.default_model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.7,
             "max_tokens": 2000
         }
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://curio-cloud-backend.com",
-            "X-Title": "CurioCloud Teaching Assistant"
+        result = await self._make_api_call(payload)
+        if result:
+            content = result["choices"][0]["message"]["content"]
+            lesson_plan = self._clean_and_parse_json(content)
+            if lesson_plan:
+                return self._validate_lesson_plan(lesson_plan)
+        return None
+
+    async def generate_multiple_choice_questions(self, content: str, num_questions: int, difficulty: str) -> Optional[list[Dict[str, Any]]]:
+        """
+        生成选择题
+
+        Args:
+            content: 教案内容
+            num_questions: 题目数量
+            difficulty: 题目难度
+
+        Returns:
+            生成的选择题列表，如果失败返回None
+        """
+        prompt = get_multiple_choice_prompt(content, num_questions, difficulty)
+        payload = {
+            "model": self.default_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 2000
         }
 
-        for attempt in range(self.max_retries):
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(
-                        f"{self.base_url}/chat/completions",
-                        json=payload,
-                        headers=headers
-                    )
-
-                    if response.status_code == 200:
-                        result = response.json()
-                        content = result["choices"][0]["message"]["content"]
-
-                        # 尝试解析JSON响应
-                        try:
-                            # 清理响应内容，移除可能的markdown代码块标记
-                            content = content.strip()
-                            if content.startswith('```json'):
-                                content = content[7:]  # 移除 ```json
-                            if content.startswith('```'):
-                                content = content[3:]  # 移除 ```
-                            if content.endswith('```'):
-                                content = content[:-3]  # 移除结尾的 ```
-                            content = content.strip()  # 再次清理空白字符
-
-                            lesson_plan = json.loads(content)
-                            return self._validate_lesson_plan(lesson_plan)
-                        except json.JSONDecodeError as e:
-                            print(f"JSON解析失败: {e}")
-                            print(f"清理后的AI响应内容: {content[:200]}...")
-                            continue
-                    else:
-                        print(f"API请求失败 (尝试 {attempt + 1}/{self.max_retries}): {response.status_code}")
-                        print(f"响应内容: {response.text}")
-                        continue
-
-            except Exception as e:
-                print(f"AI服务请求异常 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
-                continue
-
+        result = await self._make_api_call(payload)
+        if result:
+            content_str = result["choices"][0]["message"]["content"]
+            questions = self._clean_and_parse_json(content_str)
+            if isinstance(questions, list):
+                return questions
         return None
 
     def _build_prompt(self, lesson_data: Dict[str, Any]) -> str:
@@ -113,7 +146,7 @@ class AIService:
         topic = lesson_data.get("topic", "")
         duration = lesson_data.get("duration_minutes", 45)
 
-        prompt = f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
+        return f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
 
 # 课程基本信息
 - 学科: {subject}
@@ -159,8 +192,6 @@ class AIService:
   ]
 }}"""
 
-        return prompt
-
     def _validate_lesson_plan(self, lesson_plan: Dict[str, Any]) -> Dict[str, Any]:
         """
         验证AI生成的教学计划格式
@@ -177,7 +208,6 @@ class AIService:
             if key not in lesson_plan:
                 raise ValueError(f"教学计划缺少必需字段: {key}")
 
-        # 验证activities格式
         if not isinstance(lesson_plan["activities"], list):
             raise ValueError("activities必须是列表格式")
 
