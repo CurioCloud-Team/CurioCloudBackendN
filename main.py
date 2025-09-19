@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import create_tables
-from app.routers import auth_router
+from app.routers import auth_router, exercise_router
 from app.routers.user import router as user_router
 from app.routers.teaching import router as teaching_router
 
@@ -60,6 +60,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(teaching_router)
+app.include_router(exercise_router)
 
 
 @app.get("/", tags=["根路径"])

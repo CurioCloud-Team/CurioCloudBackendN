@@ -7,7 +7,7 @@ import pytest
 import asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
@@ -26,13 +26,16 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def override_get_db():
-    """覆盖数据库依赖用于测试"""
+@pytest.fixture(scope="function")
+def db():
+    """数据库会话fixture"""
+    Base.metadata.create_all(bind=engine)
+    db_session = TestingSessionLocal()
     try:
-        db = TestingSessionLocal()
-        yield db
+        yield db_session
     finally:
-        db.close()
+        db_session.close()
+        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="session")
@@ -44,24 +47,21 @@ def event_loop():
 
 
 @pytest.fixture(scope="function")
-def client():
+def client(db):
     """创建测试客户端"""
-    # 创建测试数据库表
-    Base.metadata.create_all(bind=engine)
-    
-    # 覆盖数据库依赖
+    def override_get_db():
+        yield db
+
     app.dependency_overrides[get_db] = override_get_db
     
     with TestClient(app) as test_client:
         yield test_client
     
-    # 清理
-    Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def sample_user_data():
+def test_user_data():
     """示例用户数据"""
     return {
         "username": "testuser",
@@ -82,10 +82,10 @@ def sample_login_data():
 
 
 @pytest.fixture
-def auth_headers(client: TestClient, sample_user_data):
+def auth_headers(client: TestClient, test_user_data):
     """获取认证头部"""
     # 注册用户
-    register_response = client.post("/api/auth/register", json=sample_user_data)
+    register_response = client.post("/api/auth/register", json=test_user_data)
     assert register_response.status_code == 201  # 注册接口返回201
     
     # 获取令牌
@@ -94,17 +94,37 @@ def auth_headers(client: TestClient, sample_user_data):
     return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.fixture
-def authenticated_user(client: TestClient, sample_user_data):
+@pytest.fixture(scope="function")
+def authenticated_user(client: TestClient, test_user_data, db: Session):
     """创建已认证的用户并返回用户信息和令牌"""
-    # 注册用户
-    register_response = client.post("/api/auth/register", json=sample_user_data)
-    assert register_response.status_code == 201  # 注册接口返回201
+    from app.models.user import User
+    from app.services.auth_service import AuthService
+    from app.schemas.user import UserCreate, UserResponse
+
+    # 确保用户在数据库中
+    db_user = db.query(User).filter(User.username == test_user_data["username"]).first()
+    if not db_user:
+        auth_service = AuthService(db)
+        user_create = UserCreate(**test_user_data)
+        auth_service.register_user(user_data=user_create)
+        db_user = db.query(User).filter(User.username == test_user_data["username"]).first()
+
+    # 登录获取token
+    login_response = client.post("/api/auth/login", json={
+        "username": test_user_data["username"],
+        "password": test_user_data["password"]
+    })
+    assert login_response.status_code == 200
     
-    response_data = register_response.json()
+    token_data = login_response.json()["token"]
     
+    # 从数据库获取最新的用户信息
+    db.refresh(db_user)
+
+    user_response = UserResponse.from_orm(db_user)
+
     return {
-        "user": response_data["user"],
-        "token": response_data["token"]["access_token"],
-        "headers": {"Authorization": f"Bearer {response_data['token']['access_token']}"}
+        "user": user_response.dict(),
+        "token": token_data["access_token"],
+        "headers": {"Authorization": f"Bearer {token_data['access_token']}"}
     }
