@@ -108,9 +108,6 @@ class AIService:
         Returns:
             完整的提示词字符串
         """
-        # 增加日志，用于调试传入的数据
-        print(f"[AI_SERVICE_DEBUG] Building prompt with lesson_data: {lesson_data}")
-
         subject = lesson_data.get("subject", "")
         grade = lesson_data.get("grade", "")
         topic = lesson_data.get("topic", "")

@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "fastapi Docs": {
+      "type": "sse",
+      "url": "https://gitmcp.io/fastapi/fastapi"
+    },
+    "langchain Docs": {
+      "type": "sse",
+      "url": "https://gitmcp.io/langchain-ai/langchain"
+    }
+  }
+}
