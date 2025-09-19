@@ -8,7 +8,7 @@ import httpx
 from typing import Dict, Any, Optional
 
 from app.core.config import settings
-from app.prompts.exercise_prompts import get_multiple_choice_prompt
+from app.prompts.exercise_prompts import get_multiple_choice_prompt, get_fill_in_the_blank_prompt
 
 
 class AIService:
@@ -116,6 +116,34 @@ class AIService:
             生成的选择题列表，如果失败返回None
         """
         prompt = get_multiple_choice_prompt(content, num_questions, difficulty)
+        payload = {
+            "model": self.default_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+
+        result = await self._make_api_call(payload)
+        if result:
+            content_str = result["choices"][0]["message"]["content"]
+            questions = self._clean_and_parse_json(content_str)
+            if isinstance(questions, list):
+                return questions
+        return None
+
+    async def generate_fill_in_the_blank_questions(self, content: str, num_questions: int, difficulty: str) -> Optional[list[Dict[str, Any]]]:
+        """
+        生成填空题
+
+        Args:
+            content: 教案内容
+            num_questions: 题目数量
+            difficulty: 题目难度
+
+        Returns:
+            生成的填空题列表，如果失败返回None
+        """
+        prompt = get_fill_in_the_blank_prompt(content, num_questions, difficulty)
         payload = {
             "model": self.default_model,
             "messages": [{"role": "user", "content": prompt}],

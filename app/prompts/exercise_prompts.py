@@ -37,5 +37,27 @@ def get_multiple_choice_prompt(content: str, num_questions: int, difficulty: str
     {content}
     ---
 
+    # ...existing code...
+    Please provide only the JSON array as the output.
+    """
+
+def get_fill_in_the_blank_prompt(content: str, num_questions: int, difficulty: str) -> str:
+    """
+    Returns the prompt for generating fill-in-the-blank questions.
+    """
+    return f"""
+    Based on the following lesson plan content, please generate {num_questions} fill-in-the-blank questions with a difficulty level of '{difficulty}'.
+    The question content should use '___' to represent the blank.
+    The output must be a valid JSON array, where each object represents a question and has the following structure:
+    {{
+        "content": "The question text with '___' for the blank.",
+        "answer": "The correct answer for the blank."
+    }}
+
+    Lesson Plan Content:
+    ---
+    {content}
+    ---
+
     Please provide only the JSON array as the output.
     """

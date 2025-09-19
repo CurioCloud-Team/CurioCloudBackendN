@@ -76,4 +76,45 @@ def test_generate_multiple_choice_questions(
     assert question_in_db.lesson_plan_id == test_lesson_plan.id
     assert len(question_in_db.choices) == 4
 
+def test_generate_fill_in_the_blank_questions(
+    client: TestClient,
+    db: Session,
+    authenticated_user: dict,
+    test_lesson_plan: LessonPlan,
+    mocker
+):
+    """测试生成填空题的API"""
+    # Mock the AI service call
+    mock_response = [
+        {
+            "content": "光合作用的公式是：6CO2 + 6H2O -> C6H12O6 + ___。",
+            "answer": "6O2"
+        }
+    ]
+    mocker.patch(
+        "app.services.ai_service.AIService.generate_fill_in_the_blank_questions",
+        return_value=mock_response
+    )
+
+    headers = authenticated_user['headers']
+    response = client.post(
+        f"/api/exercises/lesson-plan/{test_lesson_plan.id}/generate-fill-in-the-blank",
+        headers=headers,
+        json={"num_questions": 1, "difficulty": "medium"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["content"] == "光合作用的公式是：6CO2 + 6H2O -> C6H12O6 + ___。"
+    assert data[0]["answer"] == "6O2"
+    assert len(data[0]["choices"]) == 0 # 填空题没有选项
+
+    # 验证数据库中是否已保存
+    question_in_db = db.query(Question).filter(Question.content.like("%光合作用的公式是%")).first()
+    assert question_in_db is not None
+    assert question_in_db.lesson_plan_id == test_lesson_plan.id
+    assert question_in_db.answer == "6O2"
+    assert len(question_in_db.choices) == 0
+
 

@@ -99,20 +99,18 @@ def authenticated_user(client: TestClient, test_user_data, db: Session):
     """创建已认证的用户并返回用户信息和令牌"""
     from app.models.user import User
     from app.services.auth_service import AuthService
+    from app.schemas.user import UserCreate
 
     # 确保用户在数据库中
     user = db.query(User).filter(User.username == test_user_data["username"]).first()
     if not user:
         auth_service = AuthService(db)
-        user = auth_service.register_user(
-            username=test_user_data["username"],
-            email=test_user_data["email"],
-            password=test_user_data["password"],
-            full_name=test_user_data["full_name"]
-        )
+        user_create = UserCreate(**test_user_data)
+        auth_response = auth_service.register_user(user_data=user_create)
+        user = auth_response.user
     
     # 登录获取token
-    login_response = client.post("/api/auth/login", data={
+    login_response = client.post("/api/auth/login", json={
         "username": test_user_data["username"],
         "password": test_user_data["password"]
     })
