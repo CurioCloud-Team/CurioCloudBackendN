@@ -1,82 +1,82 @@
 """
-This module contains the prompt templates for generating exercises.
+本模块包含用于生成练习题的提示模板。
 """
 
 def get_multiple_choice_prompt(content: str, num_questions: int, difficulty: str) -> str:
     """
-    Returns the prompt for generating multiple-choice questions.
+    返回生成选择题的提示。
     """
     return f"""
-    Based on the following lesson plan content, please generate {num_questions} multiple-choice questions with a difficulty level of '{difficulty}'.
-    The output must be a valid JSON array, where each object represents a question and has the following structure:
+    请根据以下教案内容，生成 {num_questions} 道难度为 '{difficulty}' 的选择题。
+    输出必须是一个有效的JSON数组，其中每个对象代表一个问题，并具有以下结构:
     {{
-        "content": "The question text",
+        "content": "题目文本",
         "choices": [
             {{
-                "content": "Choice A",
+                "content": "选项A",
                 "is_correct": false
             }},
             {{
-                "content": "Choice B",
+                "content": "选项B",
                 "is_correct": true
             }},
             {{
-                "content": "Choice C",
+                "content": "选项C",
                 "is_correct": false
             }},
             {{
-                "content": "Choice D",
+                "content": "选项D",
                 "is_correct": false
             }}
         ],
-        "answer": "A detailed explanation of the correct answer."
+        "answer": "对正确答案的详细解释。"
     }}
 
-    Lesson Plan Content:
+    教案内容:
     ---
     {content}
     ---
 
-    Please provide only the JSON array as the output.
+    请仅提供JSON数组作为输出。
     """
 
 def get_fill_in_the_blank_prompt(content: str, num_questions: int, difficulty: str) -> str:
     """
-    Returns the prompt for generating fill-in-the-blank questions.
+    返回生成填空题的提示。
     """
     return f"""
-    Based on the following lesson plan content, please generate {num_questions} fill-in-the-blank questions with a difficulty level of '{difficulty}'.
-    The question content should use '___' to represent the blank.
-    The output must be a valid JSON array, where each object represents a question and has the following structure:
+    请根据以下教案内容，生成 {num_questions} 道难度为 '{difficulty}' 的填空题。
+    题目内容应使用“___”代表空格。
+    输出必须是一个有效的JSON数组，其中每个对象代表一个问题，并具有以下结构:
     {{
-        "content": "The question text with '___' for the blank.",
-        "answer": "The correct answer for the blank."
+        "content": "带有“___”空格的题目文本。",
+        "answer": "空格的正确答案。"
     }}
 
-    Lesson Plan Content:
+    教案内容:
     ---
     {content}
     ---
 
-    Please provide only the JSON array as the output.
+    请仅提供JSON数组作为输出。
     """
 
 def get_short_answer_prompt(content: str, num_questions: int, difficulty: str) -> str:
     """
-    Returns the prompt for generating short-answer questions.
+    返回生成简答题的提示。
     """
     return f"""
-    Based on the following lesson plan content, please generate {num_questions} short-answer questions with a difficulty level of '{difficulty}'.
-    The output must be a valid JSON array, where each object represents a question and has the following structure:
+    请根据以下教案内容，生成 {num_questions} 道难度为 '{difficulty}' 的简答题。
+    输出必须是一个有效的JSON数组，其中每个对象代表一个问题，并具有以下结构:
     {{
-        "content": "The question text.",
-        "answer": "A model answer or key points for the short-answer question."
+        "content": "题目文本。",
+        "answer": "简答题的参考答案或要点。"
     }}
 
-    Lesson Plan Content:
+    教案内容:
     ---
     {content}
     ---
 
-    Please provide only the JSON array as the output.
+    请仅提供JSON数组作为输出。
     """
