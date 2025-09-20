@@ -42,7 +42,8 @@ class TeachingService:
                 user_id=user_id,
                 status=SessionStatus.in_progress,
                 current_step=CONVERSATION_FLOW['start_step'],
-                collected_data={}
+                collected_data={},
+                history=[]
             )
 
             self.db.add(session)
@@ -87,6 +88,15 @@ class TeachingService:
             if not current_step_config:
                 raise ValueError("无效的对话步骤")
 
+            # 记录对话历史
+            question = self._get_question_card(session.current_step)
+            session.history.append({
+                "step": session.current_step,
+                "question": question['question'],
+                "answer": answer
+            })
+            flag_modified(session, "history")
+
             # 保存用户回答
             key_to_save = current_step_config['key_to_save']
             session.collected_data[key_to_save] = answer
@@ -108,6 +118,7 @@ class TeachingService:
                 if lesson_plan_data:
                     # 保存教案到数据库
                     lesson_plan = self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
+                    session.lesson_plan_id = lesson_plan.id
                     session.status = SessionStatus.completed
                     self.db.commit()
 

@@ -31,6 +31,7 @@ class LessonCreationSession(Base):
 
     # 外键关联
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="关联用户ID")
+    lesson_plan_id = Column(Integer, ForeignKey("lesson_plans.id"), nullable=True, comment="关联教案ID")
 
     # 会话状态
     status = Column(Enum(SessionStatus), default=SessionStatus.in_progress, comment="会话状态")
@@ -40,6 +41,7 @@ class LessonCreationSession(Base):
 
     # 收集的数据
     collected_data = Column(JSON, default=dict, comment="已收集的用户回答数据")
+    history = Column(JSON, nullable=False, comment="存储对话历史记录")
 
     # 时间戳
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
@@ -47,6 +49,7 @@ class LessonCreationSession(Base):
 
     # 关联关系
     user = relationship("User", backref="lesson_sessions")
+    lesson_plan = relationship("LessonPlan", backref="lesson_creation_session")
 
     def __repr__(self):
         """字符串表示"""
