@@ -89,11 +89,16 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     
-    # 开发环境启动配置
+    # 启动服务器 - 开发环境配置
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.debug,
-        log_level="info"
+        log_level="debug" if settings.debug else "info",  # 开发环境使用debug日志
+        workers=4 if not settings.debug else 1,  # 生产环境多进程，开发环境单进程（支持reload）
+        access_log=True,  # 启用访问日志
+        loop="asyncio",  # 使用asyncio事件循环
+        http="httptools",  # 使用更快的HTTP解析器
+        lifespan="on"  # 启用生命周期事件
     )

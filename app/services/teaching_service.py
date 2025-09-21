@@ -154,14 +154,14 @@ class TeachingService:
 
     def delete_lesson_plan(self, plan_id: int, user_id: int) -> bool:
         """
-        删除教案
+        删除指定的教案
 
         Args:
             plan_id: 教案ID
             user_id: 用户ID
 
         Returns:
-            是否删除成功
+            删除是否成功
         """
         try:
             lesson_plan = self.db.query(LessonPlan).filter_by(id=plan_id, user_id=user_id).first()
@@ -173,7 +173,96 @@ class TeachingService:
         except Exception as e:
             self.db.rollback()
             print(f"删除教案失败: {type(e).__name__}: {e}")
-            raise
+            return False
+
+    def _extract_subject_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
+        """
+        从收集的数据中智能提取学科信息
+        
+        Args:
+            collected_data: 收集的用户数据
+            
+        Returns:
+            学科名称
+        """
+        # 首先检查直接的subject字段
+        if collected_data.get("subject"):
+            return collected_data["subject"]
+        
+        # 从动态问题答案中提取学科信息
+        for key, value in collected_data.items():
+            if key.startswith("question_") and key.endswith("_answer") and value:
+                # 检查答案中是否包含常见学科关键词
+                subject_keywords = {
+                    "数学": ["数学", "算术", "代数", "几何", "微积分", "统计", "计算", "方程"],
+                    "语文": ["语文", "中文", "文学", "作文", "阅读", "古诗", "诗歌", "散文"],
+                    "英语": ["英语", "English", "英文", "单词", "语法", "听力", "口语", "写作"],
+                    "物理": ["物理", "力学", "电学", "光学", "热学", "声学", "运动", "能量"],
+                    "化学": ["化学", "元素", "分子", "化合物", "反应", "实验", "原子", "离子"],
+                    "生物": ["生物", "细胞", "遗传", "进化", "生态", "植物", "动物", "基因"],
+                    "历史": ["历史", "古代", "近代", "现代", "朝代", "战争", "文明", "文化"],
+                    "地理": ["地理", "地图", "气候", "地形", "国家", "城市", "河流", "山脉"],
+                    "政治": ["政治", "法律", "宪法", "政府", "公民", "权利", "民主", "法制"],
+                    "音乐": ["音乐", "歌曲", "乐器", "节拍", "音符", "合唱", "旋律", "节奏"],
+                    "美术": ["美术", "绘画", "素描", "色彩", "艺术", "创作", "设计", "雕塑"],
+                    "体育": ["体育", "运动", "健身", "球类", "跑步", "游泳", "锻炼", "比赛"],
+                    "信息技术": ["计算机", "编程", "软件", "网络", "信息技术", "IT", "代码", "程序"]
+                }
+                
+                value_lower = value.lower()
+                for subject, keywords in subject_keywords.items():
+                    if any(keyword in value_lower for keyword in keywords):
+                        return subject
+        
+        return ""
+
+    def _extract_grade_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
+        """
+        从收集的数据中智能提取年级信息
+        
+        Args:
+            collected_data: 收集的用户数据
+            
+        Returns:
+            年级信息
+        """
+        # 首先检查直接的grade字段
+        if collected_data.get("grade"):
+            return collected_data["grade"]
+        
+        # 从动态问题答案中提取年级信息
+        for key, value in collected_data.items():
+            if key.startswith("question_") and key.endswith("_answer") and value:
+                # 年级匹配模式 - 按照优先级排序，更具体的匹配在前
+                grade_patterns = [
+                    # 初中 - 具体年级
+                    ("初中一年级", "初中一年级"), ("初中二年级", "初中二年级"), ("初中三年级", "初中三年级"),
+                    ("初一", "初中一年级"), ("初二", "初中二年级"), ("初三", "初中三年级"),
+                    ("七年级", "初中一年级"), ("八年级", "初中二年级"), ("九年级", "初中三年级"),
+                    # 高中 - 具体年级
+                    ("高中一年级", "高中一年级"), ("高中二年级", "高中二年级"), ("高中三年级", "高中三年级"),
+                    ("高一", "高中一年级"), ("高二", "高中二年级"), ("高三", "高中三年级"),
+                    # 小学 - 具体年级
+                    ("小学一年级", "小学一年级"), ("小学二年级", "小学二年级"), ("小学三年级", "小学三年级"),
+                    ("小学四年级", "小学四年级"), ("小学五年级", "小学五年级"), ("小学六年级", "小学六年级"),
+                    # 大学 - 具体年级
+                    ("大学一年级", "大学一年级"), ("大学二年级", "大学二年级"), ("大学三年级", "大学三年级"), ("大学四年级", "大学四年级"),
+                    ("大一", "大学一年级"), ("大二", "大学二年级"), ("大三", "大学三年级"), ("大四", "大学四年级"),
+                    # 通用年级（只有在没有学段前缀时才匹配）
+                    ("一年级", "小学一年级"), ("二年级", "小学二年级"), ("三年级", "小学三年级"),
+                    ("四年级", "小学四年级"), ("五年级", "小学五年级"), ("六年级", "小学六年级"),
+                    # 学段（最后匹配）
+                    ("初中", "初中"), ("高中", "高中"), ("小学", "小学"), ("大学", "大学"),
+                    # 幼儿园
+                    ("幼儿园", "幼儿园"), ("学前班", "学前班")
+                ]
+                
+                value_lower = value.lower()
+                for pattern, grade in grade_patterns:
+                    if pattern in value_lower:
+                        return grade
+        
+        return ""
 
     def _get_question_card(self, step_key: str) -> Dict[str, Any]:
         """
@@ -206,12 +295,16 @@ class TeachingService:
             保存的LessonPlan对象
         """
         try:
+            # 智能提取学科和年级信息
+            subject = self._extract_subject_from_collected_data(collected_data)
+            grade = self._extract_grade_from_collected_data(collected_data)
+            
             # 创建教案
             lesson_plan = LessonPlan(
                 user_id=user_id,
                 title=lesson_plan_data['title'],
-                subject=collected_data.get('subject', ''),
-                grade=collected_data.get('grade', ''),
+                subject=subject,
+                grade=grade,
                 teaching_objective='\n'.join(lesson_plan_data['learning_objectives']),
                 teaching_outline=lesson_plan_data['teaching_outline']
             )

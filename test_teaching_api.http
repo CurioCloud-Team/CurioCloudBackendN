@@ -1,0 +1,119 @@
+# 教学API测试文件
+# 测试教案生成功能和修复效果
+
+### 1. 用户注册 (获取令牌)
+POST http://localhost:8000/api/auth/register
+Content-Type: application/json
+
+{
+    "username": "teachinguser",
+    "email": "teaching@example.com",
+    "password": "Teaching123!",
+    "confirm_password": "Teaching123!",
+    "full_name": "教学测试用户"
+}
+
+### 2. 用户登录
+POST http://localhost:8000/api/auth/login
+Content-Type: application/json
+
+{
+    "username": "teachinguser",
+    "password": "Teaching123!"
+}
+
+### 3. 开始教学对话 (动态模式)
+POST http://localhost:8000/api/teaching/conversational/start
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "use_dynamic_mode": true
+}
+
+### 4. 提交第一个回答 (包含学科信息)
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{session_id}}",
+    "answer": "我想准备一堂数学课，主要讲解二次方程的解法"
+}
+
+### 5. 提交第二个回答 (包含年级信息)
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{session_id}}",
+    "answer": "这是针对初中二年级的学生，他们已经学过一次方程"
+}
+
+### 6. 提交第三个回答 (课程时长)
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{session_id}}",
+    "answer": "课程时长是45分钟，希望能够让学生掌握基本的解题方法"
+}
+
+### 7. 获取教案列表
+GET http://localhost:8000/api/teaching/lesson-plans
+Authorization: Bearer {{access_token}}
+
+### 8. 获取单个教案详情
+GET http://localhost:8000/api/teaching/lesson-plans/{{lesson_plan_id}}
+Authorization: Bearer {{access_token}}
+
+### 9. 开始传统模式对话
+POST http://localhost:8000/api/teaching/conversational/start
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "use_dynamic_mode": false
+}
+
+### 10. 传统模式 - 选择学科
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{traditional_session_id}}",
+    "answer": "物理"
+}
+
+### 11. 传统模式 - 选择年级
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{traditional_session_id}}",
+    "answer": "高中一年级"
+}
+
+### 12. 传统模式 - 输入课题
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{traditional_session_id}}",
+    "answer": "牛顿第一定律"
+}
+
+### 13. 传统模式 - 设置时长
+POST http://localhost:8000/api/teaching/conversational/next
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+    "session_id": "{{traditional_session_id}}",
+    "answer": "40"
+}
