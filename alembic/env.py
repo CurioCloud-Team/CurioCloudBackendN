@@ -24,11 +24,8 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.core.database import Base
-from app.models.user import User # noqa
-from app.models.lesson_plan import LessonPlan # noqa
-from app.models.lesson_plan_activity import LessonPlanActivity # noqa
-from app.models.exercise import Question # noqa
-from app.models.lesson_creation_session import LessonCreationSession # noqa
+# Import all models here for autogenerate support
+from app.models import *
 
 target_metadata = Base.metadata
 
@@ -37,7 +34,8 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 from app.core.config import settings
-config.set_main_option('sqlalchemy.url', settings.database_url)
+config.set_main_option('sqlalchemy.url', str(settings.database_url))
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
