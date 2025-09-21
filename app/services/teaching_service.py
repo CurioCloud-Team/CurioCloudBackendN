@@ -4,13 +4,16 @@
 处理对话式教学设计的业务逻辑
 """
 import uuid
+import traceback
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
+from fastapi import HTTPException, status
 
 from app.models import LessonCreationSession, LessonPlan, LessonPlanActivity, SessionStatus
 from app.services.ai_service import AIService
+from app.services.dynamic_question_service import DynamicQuestionService
 from app.conversation_flow import CONVERSATION_FLOW, get_step_config, get_next_step, is_final_step
 from app.core.config import settings
 
@@ -21,13 +24,15 @@ class TeachingService:
     def __init__(self, db: Session):
         self.db = db
         self.ai_service = AIService()
+        self.dynamic_question_service = DynamicQuestionService()
 
-    def start_conversation(self, user_id: int) -> Dict[str, Any]:
+    def start_conversation(self, user_id: int, use_dynamic_mode: bool = True) -> Dict[str, Any]:
         """
         开始新的教学设计对话
 
         Args:
             user_id: 用户ID
+            use_dynamic_mode: 是否使用动态问题生成模式
 
         Returns:
             包含会话ID和第一个问题的字典
@@ -41,9 +46,11 @@ class TeachingService:
                 session_id=session_id,
                 user_id=user_id,
                 status=SessionStatus.in_progress,
-                current_step=CONVERSATION_FLOW['start_step'],
+                current_step=CONVERSATION_FLOW['start_step'] if not use_dynamic_mode else 'dynamic_question_1',
                 collected_data={},
-                history=[]
+                history=[],
+                ai_questions_asked=0,
+                max_ai_questions=5
             )
 
             self.db.add(session)
@@ -51,22 +58,32 @@ class TeachingService:
             self.db.refresh(session)
 
             # 获取第一个问题
-            first_question = self._get_question_card(CONVERSATION_FLOW['start_step'])
+            if use_dynamic_mode:
+                # 使用动态问题生成
+                first_question = self._get_dynamic_first_question()
+            else:
+                # 使用传统固定流程
+                first_question = self._get_question_card(CONVERSATION_FLOW['start_step'])
 
             return {
                 "session_id": session_id,
-                "question_card": first_question
+                "question_card": first_question,
+                "is_dynamic_mode": use_dynamic_mode
             }
 
         except Exception as e:
             self.db.rollback()
             print(f"开始对话失败: {type(e).__name__}: {e}")
-            raise
+            print(f"详细错误信息: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="开始对话失败，请稍后重试"
+            )
 
     async def process_answer(self, session_id: str, answer: str) -> Dict[str, Any]:
         """
-        处理用户回答并返回下一步或最终结果
-
+        处理用户回答并返回下一步问题或最终教案
+        
         Args:
             session_id: 会话ID
             answer: 用户回答
@@ -83,71 +100,20 @@ class TeachingService:
             if session.status != SessionStatus.in_progress:
                 raise ValueError("会话已完成或失败")
 
-            # 获取当前步骤配置
-            current_step_config = get_step_config(session.current_step)
-            if not current_step_config:
-                raise ValueError("无效的对话步骤")
-
-            # 记录对话历史
-            question = self._get_question_card(session.current_step)
-            session.history.append({
-                "step": session.current_step,
-                "question": question['question'],
-                "answer": answer
-            })
-            flag_modified(session, "history")
-
-            # 保存用户回答
-            key_to_save = current_step_config['key_to_save']
-            session.collected_data[key_to_save] = answer
-
-            # 标记 collected_data 字段已被修改，确保数据库更新
-            flag_modified(session, "collected_data")
-
-            # 获取下一步
-            next_step = get_next_step(session.current_step)
-
-            if next_step == 'finalize':
-                # 流程结束，开始生成教案
-                session.status = SessionStatus.processing
-                self.db.commit()
-
-                # 直接调用异步AI服务
-                lesson_plan_data = await self.ai_service.generate_lesson_plan(session.collected_data)
-
-                if lesson_plan_data:
-                    # 保存教案到数据库
-                    lesson_plan = self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
-                    session.lesson_plan_id = lesson_plan.id
-                    session.status = SessionStatus.completed
-                    self.db.commit()
-
-                    return {
-                        "session_id": session_id,
-                        "status": "completed",
-                        "lesson_plan": self._format_lesson_plan_response(lesson_plan)
-                    }
-                else:
-                    session.status = SessionStatus.failed
-                    self.db.commit()
-                    raise ValueError("教案生成失败")
-
+            # 根据模式处理回答
+            if session.current_step.startswith('dynamic_question_'):
+                return await self._process_dynamic_answer(session, answer)
             else:
-                # 更新当前步骤
-                session.current_step = next_step
-                self.db.commit()
-
-                # 返回下一个问题
-                next_question = self._get_question_card(next_step)
-                return {
-                    "session_id": session_id,
-                    "question_card": next_question
-                }
+                return await self._process_traditional_answer(session, answer)
 
         except Exception as e:
             self.db.rollback()
             print(f"处理回答失败: {type(e).__name__}: {e}")
-            raise
+            print(f"详细错误信息: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="处理回答失败，请稍后重试"
+            )
 
     def get_lesson_plans(self, user_id: int) -> List[Dict[str, Any]]:
         """
@@ -299,3 +265,272 @@ class TeachingService:
             "activities": sorted(activities, key=lambda x: x['order_index']),
             "created_at": lesson_plan.created_at.isoformat() if lesson_plan.created_at else None
         }
+
+    def _get_dynamic_first_question(self) -> Dict[str, Any]:
+        """
+        获取动态模式的第一个问题
+        
+        Returns:
+            第一个问题卡片
+        """
+        # 第一个问题通常是基础信息收集
+        return {
+            "step_key": "dynamic_question_1",
+            "question": "您好！我们来一起设计一堂精彩的课程。首先，请告诉我这堂课是关于哪个学科的？",
+            "question_type": "basic_info",
+            "key_to_save": "subject",
+            "options": ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理"],
+            "allows_free_text": True,
+            "priority": "high"
+        }
+    
+    async def _process_dynamic_answer(self, session: LessonCreationSession, answer: str) -> Dict[str, Any]:
+        """
+        处理动态模式下的用户回答
+        
+        Args:
+            session: 会话对象
+            answer: 用户回答
+            
+        Returns:
+            处理结果
+        """
+        # 记录对话历史
+        current_question = self._get_current_question_for_history(session)
+        session.history.append({
+            "step": session.current_step,
+            "question": current_question,
+            "answer": answer,
+            "question_count": session.ai_questions_asked + 1
+        })
+        flag_modified(session, "history")
+        
+        # 保存用户回答 - 使用动态键名
+        key_to_save = f"question_{session.ai_questions_asked + 1}_answer"
+        session.collected_data[key_to_save] = answer
+        
+        # 更新问题计数
+        session.ai_questions_asked += 1
+        flag_modified(session, "collected_data")
+        
+        # 判断是否应该继续提问
+        continue_decision = self.dynamic_question_service.should_continue_questioning(
+                session.collected_data,
+                session.ai_questions_asked,
+                3,  # 使用固定的最小问题数量
+                session.max_ai_questions
+            )
+        
+        if not continue_decision["should_continue"]:
+            # 结束提问，生成教案
+            return await self._finalize_lesson_plan(session)
+        
+        # 生成下一个问题
+        next_question = await self.dynamic_question_service.generate_next_question(
+                session.collected_data,
+                session.ai_questions_asked,
+                session.max_ai_questions
+            )
+        
+        if next_question:
+            # 更新会话状态
+            session.current_step = f"dynamic_question_{session.ai_questions_asked + 1}"
+            self.db.commit()
+            
+            return {
+                "session_id": session.session_id,
+                "status": "in_progress",
+                "is_dynamic_mode": True,
+                "question_card": next_question,
+                "question_count": session.ai_questions_asked,
+                "max_questions": session.max_ai_questions
+            }
+        else:
+            # 无法生成更多问题，结束流程
+            return await self._finalize_lesson_plan(session)
+    
+    async def _process_traditional_answer(self, session: LessonCreationSession, answer: str) -> Dict[str, Any]:
+        """
+        处理传统模式下的用户回答
+        
+        Args:
+            session: 会话对象
+            answer: 用户回答
+            
+        Returns:
+            处理结果
+        """
+        # 获取当前步骤配置
+        current_step_config = get_step_config(session.current_step)
+        if not current_step_config:
+            raise ValueError("无效的对话步骤")
+
+        # 记录对话历史
+        question = self._get_question_card(session.current_step)
+        session.history.append({
+            "step": session.current_step,
+            "question": question['question'],
+            "answer": answer
+        })
+        flag_modified(session, "history")
+
+        # 保存用户回答
+        key_to_save = current_step_config['key_to_save']
+        session.collected_data[key_to_save] = answer
+
+        # 标记 collected_data 字段已被修改，确保数据库更新
+        flag_modified(session, "collected_data")
+
+        # 获取下一步
+        next_step = get_next_step(session.current_step)
+
+        if next_step == 'finalize':
+            # 流程结束，开始生成教案
+            return await self._finalize_lesson_plan(session)
+        else:
+            # 更新当前步骤
+            session.current_step = next_step
+            self.db.commit()
+
+            # 返回下一个问题
+            next_question = self._get_question_card(next_step)
+            return {
+                "session_id": session.session_id,
+                "status": "in_progress",
+                "is_dynamic_mode": False,
+                "question_card": next_question
+            }
+    
+    async def _finalize_lesson_plan(self, session: LessonCreationSession) -> Dict[str, Any]:
+        """
+        完成教案生成流程
+        
+        Args:
+            session: 会话对象
+            
+        Returns:
+            最终结果
+        """
+        session.status = SessionStatus.processing
+        self.db.commit()
+
+        # 调用AI服务生成教案
+        lesson_plan_data = await self.ai_service.generate_lesson_plan(session.collected_data)
+
+        if lesson_plan_data:
+            # 保存教案到数据库
+            lesson_plan = self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
+            session.lesson_plan_id = lesson_plan.id
+            session.status = SessionStatus.completed
+            self.db.commit()
+
+            return {
+                "session_id": session.session_id,
+                "status": "completed",
+                "is_dynamic_mode": session.current_step.startswith('dynamic_question_'),
+                "lesson_plan": self._format_lesson_plan_response(lesson_plan)
+            }
+        else:
+            session.status = SessionStatus.failed
+            self.db.commit()
+            raise ValueError("教案生成失败")
+    
+    def _get_current_question_for_history(self, session: LessonCreationSession) -> str:
+        """
+        获取当前问题文本用于历史记录
+        
+        Args:
+            session: 会话对象
+            
+        Returns:
+            问题文本
+        """
+        if session.current_step.startswith('dynamic_question_'):
+            # 从历史记录中获取最后一个问题，或返回默认问题
+            if session.history:
+                return session.history[-1].get("question", "动态生成的问题")
+            return "您好！我们来一起设计一堂精彩的课程。"
+        else:
+            question_card = self._get_question_card(session.current_step)
+            return question_card['question']
+
+    def get_active_sessions(self, user_id: int):
+        """
+        获取用户的活跃会话列表
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            活跃会话列表
+        """
+        sessions = self.db.query(LessonCreationSession).filter(
+            LessonCreationSession.user_id == user_id,
+            LessonCreationSession.status.in_([SessionStatus.IN_PROGRESS, SessionStatus.WAITING_FOR_INPUT])
+        ).order_by(LessonCreationSession.created_at.desc()).all()
+        
+        result = []
+        for session in sessions:
+            result.append({
+                "session_id": session.id,
+                "status": session.status.value,
+                "is_dynamic_mode": session.current_step.startswith('dynamic_question_'),
+                "question_count": session.ai_questions_asked,
+                "max_questions": session.max_ai_questions,
+                "current_step": session.current_step,
+                "collected_data": session.collected_data,
+                "created_at": session.created_at
+            })
+        
+        return result
+
+    def get_session_info(self, session_id: str, user_id: int):
+        """
+        获取会话详情
+        
+        Args:
+            session_id: 会话ID
+            user_id: 用户ID
+            
+        Returns:
+            会话详情或None
+        """
+        session = self.db.query(LessonCreationSession).filter_by(
+            id=session_id, user_id=user_id
+        ).first()
+        
+        if not session:
+            return None
+            
+        return {
+            "session_id": session.id,
+            "status": session.status.value,
+            "is_dynamic_mode": session.current_step.startswith('dynamic_question_'),
+            "question_count": session.ai_questions_asked,
+                "max_questions": session.max_ai_questions,
+            "current_step": session.current_step,
+            "collected_data": session.collected_data,
+            "created_at": session.created_at
+        }
+
+    def delete_session(self, session_id: str, user_id: int):
+        """
+        删除会话
+        
+        Args:
+            session_id: 会话ID
+            user_id: 用户ID
+            
+        Returns:
+            是否删除成功
+        """
+        session = self.db.query(LessonCreationSession).filter_by(
+            id=session_id, user_id=user_id
+        ).first()
+        
+        if not session:
+            return False
+            
+        self.db.delete(session)
+        self.db.commit()
+        return True

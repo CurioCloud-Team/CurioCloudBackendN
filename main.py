@@ -12,6 +12,7 @@ from app.core.database import create_tables
 from app.routers import auth_router, exercise_router
 from app.routers.user import router as user_router
 from app.routers.teaching import router as teaching_router
+from app.routers.session import router as session_router
 
 
 @asynccontextmanager
@@ -60,6 +61,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(teaching_router)
+app.include_router(session_router)
 app.include_router(exercise_router)
 
 

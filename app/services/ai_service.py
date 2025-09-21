@@ -197,17 +197,26 @@ class AIService:
         Returns:
             完整的提示词字符串
         """
+        # 提取基础信息
         subject = lesson_data.get("subject", "")
         grade = lesson_data.get("grade", "")
         topic = lesson_data.get("topic", "")
         duration = lesson_data.get("duration_minutes", 45)
-
-        return f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
+        
+        # 分析动态收集的数据
+        dynamic_info = self._extract_dynamic_info(lesson_data)
+        
+        # 构建增强的提示词
+        base_prompt = f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
 
 # 课程基本信息
 - 学科: {subject}
 - 年级: {grade}
 - 课题: {topic}
+- 课程时长: {duration}分钟
+
+# 收集到的详细信息
+{dynamic_info}
 
 # 任务要求
 请生成一个结构化的教学计划，必须严格遵循以下的 JSON 格式。不要在 JSON 之外添加任何解释性文字。
@@ -215,38 +224,82 @@ class AIService:
 {{
   "title": "（请为这堂课生成一个生动有趣的标题）",
   "learning_objectives": [
-    "（请生成3-4条具体的学习目标，例如：学生能够描述光合作用的概念和过程）",
+    "（请生成3-4条具体的学习目标，结合收集到的信息制定）",
     "（目标二）",
     "（目标三）"
   ],
-  "teaching_outline": "（请在这里生成一段100-200字的教学大纲或课程简介）",
+  "teaching_outline": "（请在这里生成一段150-250字的教学大纲或课程简介，体现个性化需求）",
   "activities": [
     {{
       "order": 1,
-      "name": "（第一个活动的名称，例如：课堂导入：植物如何"吃饭"？）",
-      "description": "（对第一个活动的详细描述，包括具体做什么）",
+      "name": "（第一个活动的名称，例如：课堂导入）",
+      "description": "（对第一个活动的详细描述，包括具体做什么，考虑学生特点和教学方法）",
       "duration": 5
     }},
     {{
       "order": 2,
       "name": "（第二个活动的名称）",
-      "description": "（对第二个活动的详细描述）",
+      "description": "（对第二个活动的详细描述，体现教学重点）",
       "duration": 20
     }},
     {{
       "order": 3,
       "name": "（第三个活动的名称）",
-      "description": "（对第三个活动的详细描述）",
+      "description": "（对第三个活动的详细描述，注重互动和实践）",
       "duration": 15
     }},
     {{
       "order": 4,
-      "name": "（第四个活动的名称，例如：课堂总结）",
-      "description": "（对第四个活动的详细描述）",
+      "name": "（第四个活动的名称，例如：课堂总结与评估）",
+      "description": "（对第四个活动的详细描述，包含评估方式）",
       "duration": 5
     }}
   ]
-}}"""
+}}
+
+# 设计原则
+1. 确保活动时间总和等于课程总时长
+2. 根据收集到的学生特点和教学需求调整活动设计
+3. 体现教学方法的多样性和针对性
+4. 确保学习目标与活动内容高度匹配
+5. 考虑学生的认知水平和兴趣特点"""
+
+        return base_prompt
+    
+    def _extract_dynamic_info(self, lesson_data: Dict[str, Any]) -> str:
+        """
+        从动态收集的数据中提取有用信息
+        
+        Args:
+            lesson_data: 课程数据
+            
+        Returns:
+            格式化的信息字符串
+        """
+        info_parts = []
+        
+        # 处理动态问题的答案
+        for key, value in lesson_data.items():
+            if key.startswith("question_") and key.endswith("_answer") and value:
+                question_num = key.split("_")[1]
+                info_parts.append(f"- 问题{question_num}回答: {value}")
+        
+        # 处理传统字段
+        traditional_fields = {
+            "teaching_method": "教学方法偏好",
+            "student_level": "学生水平",
+            "learning_objectives": "学习目标要求",
+            "assessment_method": "评估方式",
+            "special_requirements": "特殊要求",
+            "classroom_environment": "课堂环境",
+            "available_resources": "可用资源"
+        }
+        
+        for key, label in traditional_fields.items():
+            if key in lesson_data and lesson_data[key]:
+                info_parts.append(f"- {label}: {lesson_data[key]}")
+        
+        return "\n".join(info_parts) if info_parts else "暂无额外信息"
 
     def _validate_lesson_plan(self, lesson_plan: Dict[str, Any]) -> Dict[str, Any]:
         """
