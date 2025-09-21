@@ -600,7 +600,7 @@ class TeachingService:
             "status": session.status.value,
             "is_dynamic_mode": session.current_step.startswith('dynamic_question_'),
             "question_count": session.ai_questions_asked,
-                "max_questions": session.max_ai_questions,
+            "max_questions": session.max_ai_questions,
             "current_step": session.current_step,
             "collected_data": session.collected_data,
             "created_at": session.created_at
