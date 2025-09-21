@@ -22,8 +22,10 @@ class QuestionCard(BaseModel):
     question: str = Field(description="问题内容")
     options: List[str] = Field(description="选项列表")
     allows_free_text: bool = Field(description="是否允许自由文本输入")
-
-
+    question_type: Optional[str] = Field(default=None, description="问题类型（动态模式下使用）")
+    key_to_save: Optional[str] = Field(default=None, description="保存字段名（动态模式下使用）")
+    priority: Optional[int] = Field(default=None, description="优先级（动态模式下使用）")
+    reasoning: Optional[str] = Field(default=None, description="推理过程或补充说明（动态模式下使用）")
 class StartConversationResponse(BaseModel):
     """开始对话响应"""
     session_id: str = Field(description="会话ID")

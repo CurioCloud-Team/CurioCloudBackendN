@@ -41,10 +41,10 @@ class DynamicQuestionService:
             "max_tokens": 1000
         }
         
-        result = await self.ai_service._make_api_call(payload)
+        result = await self.ai_service.generate_json_response(payload)
         if result:
             content = result["choices"][0]["message"]["content"]
-            question_data = self.ai_service._clean_and_parse_json(content)
+            question_data = self.ai_service.clean_and_parse_json(content)
             if question_data and self._validate_question_format(question_data):
                 # 添加step_key字段
                 question_data["step_key"] = f"dynamic_question_{question_count + 1}"

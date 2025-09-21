@@ -12,8 +12,8 @@ async def test_process_answer():
         db = next(get_db())
         teaching_service = TeachingService(db)
         
-        # 使用最新的会话ID
-        session_id = 'e9999f95-3c0a-437e-8836-eefeb1459683'
+        # 动态获取最新的会话ID
+        session_id = await teaching_service.start_conversation()
         answer = '数学'
         
         print(f'测试 process_answer: session_id={session_id}, answer={answer}')
