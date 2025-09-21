@@ -197,26 +197,17 @@ class AIService:
         Returns:
             完整的提示词字符串
         """
-        # 提取基础信息，支持从动态数据中智能提取
-        subject = self._extract_subject_from_data(lesson_data)
-        grade = self._extract_grade_from_data(lesson_data)
+        subject = lesson_data.get("subject", "")
+        grade = lesson_data.get("grade", "")
         topic = lesson_data.get("topic", "")
         duration = lesson_data.get("duration_minutes", 45)
-        
-        # 分析动态收集的数据
-        dynamic_info = self._extract_dynamic_info(lesson_data)
-        
-        # 构建增强的提示词
-        base_prompt = f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
+
+        return f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
 
 # 课程基本信息
 - 学科: {subject}
 - 年级: {grade}
 - 课题: {topic}
-- 课程时长: {duration}分钟
-
-# 收集到的详细信息
-{dynamic_info}
 
 # 任务要求
 请生成一个结构化的教学计划，必须严格遵循以下的 JSON 格式。不要在 JSON 之外添加任何解释性文字。
@@ -224,171 +215,38 @@ class AIService:
 {{
   "title": "（请为这堂课生成一个生动有趣的标题）",
   "learning_objectives": [
-    "（请生成3-4条具体的学习目标，结合收集到的信息制定）",
+    "（请生成3-4条具体的学习目标，例如：学生能够描述光合作用的概念和过程）",
     "（目标二）",
     "（目标三）"
   ],
-  "teaching_outline": "（请在这里生成一段150-250字的教学大纲或课程简介，体现个性化需求）",
+  "teaching_outline": "（请在这里生成一段100-200字的教学大纲或课程简介）",
   "activities": [
     {{
       "order": 1,
-      "name": "（第一个活动的名称，例如：课堂导入）",
-      "description": "（对第一个活动的详细描述，包括具体做什么，考虑学生特点和教学方法）",
+      "name": "（第一个活动的名称，例如：课堂导入：植物如何"吃饭"？）",
+      "description": "（对第一个活动的详细描述，包括具体做什么）",
       "duration": 5
     }},
     {{
       "order": 2,
       "name": "（第二个活动的名称）",
-      "description": "（对第二个活动的详细描述，体现教学重点）",
+      "description": "（对第二个活动的详细描述）",
       "duration": 20
     }},
     {{
       "order": 3,
       "name": "（第三个活动的名称）",
-      "description": "（对第三个活动的详细描述，注重互动和实践）",
+      "description": "（对第三个活动的详细描述）",
       "duration": 15
     }},
     {{
       "order": 4,
-      "name": "（第四个活动的名称，例如：课堂总结与评估）",
-      "description": "（对第四个活动的详细描述，包含评估方式）",
+      "name": "（第四个活动的名称，例如：课堂总结）",
+      "description": "（对第四个活动的详细描述）",
       "duration": 5
     }}
   ]
-}}
-
-# 设计原则
-1. 确保活动时间总和等于课程总时长
-2. 根据收集到的学生特点和教学需求调整活动设计
-3. 体现教学方法的多样性和针对性
-4. 确保学习目标与活动内容高度匹配
-5. 考虑学生的认知水平和兴趣特点"""
-
-        return base_prompt
-    
-    def _extract_dynamic_info(self, lesson_data: Dict[str, Any]) -> str:
-        """
-        从动态收集的数据中提取有用信息
-        
-        Args:
-            lesson_data: 课程数据
-            
-        Returns:
-            格式化的信息字符串
-        """
-        info_parts = []
-        
-        # 处理动态问题的答案
-        for key, value in lesson_data.items():
-            if key.startswith("question_") and key.endswith("_answer") and value:
-                question_num = key.split("_")[1]
-                info_parts.append(f"- 问题{question_num}回答: {value}")
-        
-        # 处理传统字段
-        traditional_fields = {
-            "teaching_method": "教学方法偏好",
-            "student_level": "学生水平",
-            "learning_objectives": "学习目标要求",
-            "assessment_method": "评估方式",
-            "special_requirements": "特殊要求",
-            "classroom_environment": "课堂环境",
-            "available_resources": "可用资源"
-        }
-        
-        for key, label in traditional_fields.items():
-            if key in lesson_data and lesson_data[key]:
-                info_parts.append(f"- {label}: {lesson_data[key]}")
-        
-        return "\n".join(info_parts) if info_parts else "暂无额外信息"
-
-    def _extract_subject_from_data(self, lesson_data: Dict[str, Any]) -> str:
-        """
-        从课程数据中智能提取学科信息
-        
-        Args:
-            lesson_data: 课程数据
-            
-        Returns:
-            学科名称
-        """
-        # 首先检查直接的subject字段
-        if lesson_data.get("subject"):
-            return lesson_data["subject"]
-        
-        # 从动态问题答案中提取学科信息
-        for key, value in lesson_data.items():
-            if key.startswith("question_") and key.endswith("_answer") and value:
-                # 检查答案中是否包含常见学科关键词
-                subject_keywords = {
-                    "数学": ["数学", "算术", "代数", "几何", "微积分", "统计"],
-                    "语文": ["语文", "中文", "文学", "作文", "阅读", "古诗"],
-                    "英语": ["英语", "English", "英文", "单词", "语法", "听力"],
-                    "物理": ["物理", "力学", "电学", "光学", "热学", "声学"],
-                    "化学": ["化学", "元素", "分子", "化合物", "反应", "实验"],
-                    "生物": ["生物", "细胞", "遗传", "进化", "生态", "植物", "动物"],
-                    "历史": ["历史", "古代", "近代", "现代", "朝代", "战争", "文明"],
-                    "地理": ["地理", "地图", "气候", "地形", "国家", "城市", "河流"],
-                    "政治": ["政治", "法律", "宪法", "政府", "公民", "权利"],
-                    "音乐": ["音乐", "歌曲", "乐器", "节拍", "音符", "合唱"],
-                    "美术": ["美术", "绘画", "素描", "色彩", "艺术", "创作"],
-                    "体育": ["体育", "运动", "健身", "球类", "跑步", "游泳"],
-                    "信息技术": ["计算机", "编程", "软件", "网络", "信息技术", "IT"]
-                }
-                
-                value_lower = value.lower()
-                for subject, keywords in subject_keywords.items():
-                    if any(keyword in value_lower for keyword in keywords):
-                        return subject
-        
-        return ""
-
-    def _extract_grade_from_data(self, lesson_data: Dict[str, Any]) -> str:
-        """
-        从课程数据中智能提取年级信息
-        
-        Args:
-            lesson_data: 课程数据
-            
-        Returns:
-            年级信息
-        """
-        # 首先检查直接的grade字段
-        if lesson_data.get("grade"):
-            return lesson_data["grade"]
-        
-        # 从动态问题答案中提取年级信息
-        for key, value in lesson_data.items():
-            if key.startswith("question_") and key.endswith("_answer") and value:
-                # 检查答案中是否包含年级关键词 - 按照优先级排序，更具体的匹配在前
-                grade_patterns = [
-                    # 初中 - 具体年级
-                    ("初中一年级", "初中一年级"), ("初中二年级", "初中二年级"), ("初中三年级", "初中三年级"),
-                    ("初一", "初中一年级"), ("初二", "初中二年级"), ("初三", "初中三年级"),
-                    ("七年级", "初中一年级"), ("八年级", "初中二年级"), ("九年级", "初中三年级"),
-                    # 高中 - 具体年级
-                    ("高中一年级", "高中一年级"), ("高中二年级", "高中二年级"), ("高中三年级", "高中三年级"),
-                    ("高一", "高中一年级"), ("高二", "高中二年级"), ("高三", "高中三年级"),
-                    # 小学 - 具体年级
-                    ("小学一年级", "小学一年级"), ("小学二年级", "小学二年级"), ("小学三年级", "小学三年级"),
-                    ("小学四年级", "小学四年级"), ("小学五年级", "小学五年级"), ("小学六年级", "小学六年级"),
-                    # 大学 - 具体年级
-                    ("大学一年级", "大学一年级"), ("大学二年级", "大学二年级"), ("大学三年级", "大学三年级"), ("大学四年级", "大学四年级"),
-                    ("大一", "大学一年级"), ("大二", "大学二年级"), ("大三", "大学三年级"), ("大四", "大学四年级"),
-                    # 通用年级（只有在没有学段前缀时才匹配）
-                    ("一年级", "小学一年级"), ("二年级", "小学二年级"), ("三年级", "小学三年级"),
-                    ("四年级", "小学四年级"), ("五年级", "小学五年级"), ("六年级", "小学六年级"),
-                    # 学段（最后匹配）
-                    ("初中", "初中"), ("高中", "高中"), ("小学", "小学"), ("大学", "大学"),
-                    # 幼儿园
-                    ("幼儿园", "幼儿园"), ("学前班", "学前班")
-                ]
-                
-                value_lower = value.lower()
-                for pattern, grade in grade_patterns:
-                    if pattern in value_lower:
-                        return grade
-        
-        return ""
+}}"""
 
     def _validate_lesson_plan(self, lesson_plan: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -3,7 +3,7 @@
 
 定义教学设计对话会话相关的数据库表结构
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, Enum, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, Enum, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -38,8 +38,6 @@ class LessonCreationSession(Base):
 
     # 对话进度
     current_step = Column(String(50), comment="当前对话步骤的键")
-    ai_questions_asked = Column(Integer, default=0, comment="已提问的问题数量")
-    max_ai_questions = Column(Integer, default=5, comment="最大问题数量")
 
     # 收集的数据
     collected_data = Column(JSON, default=dict, comment="已收集的用户回答数据")

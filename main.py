@@ -12,7 +12,6 @@ from app.core.database import create_tables
 from app.routers import auth_router, exercise_router
 from app.routers.user import router as user_router
 from app.routers.teaching import router as teaching_router
-from app.routers.session import router as session_router
 
 
 @asynccontextmanager
@@ -61,7 +60,6 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(teaching_router)
-app.include_router(session_router)
 app.include_router(exercise_router)
 
 
@@ -89,16 +87,11 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     
-    # 启动服务器 - 开发环境配置
+    # 开发环境启动配置
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.debug,
-        log_level="debug" if settings.debug else "info",  # 开发环境使用debug日志
-        workers=4 if not settings.debug else 1,  # 生产环境多进程，开发环境单进程（支持reload）
-        access_log=True,  # 启用访问日志
-        loop="asyncio",  # 使用asyncio事件循环
-        http="httptools",  # 使用更快的HTTP解析器
-        lifespan="on"  # 启用生命周期事件
+        log_level="info"
     )
