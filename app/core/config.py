@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     openrouter_default_model: str = "google/gemini-2.5-flash"
     llm_max_retries: int = 3
     llm_timeout_seconds: int = 120
+
+    # 讯飞PPT API配置
+    xunfei_app_id: str
+    xunfei_api_secret: str
     
     class Config:
         """Pydantic配置"""
