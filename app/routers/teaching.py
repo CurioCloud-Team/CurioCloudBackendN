@@ -12,6 +12,14 @@ from app.dependencies.auth import get_current_user
 from app.models import User
 from app.services.teaching_service import TeachingService
 from app.schemas.user import MessageResponse
+from app.schemas.teaching import (
+    StartConversationRequest,
+    StartConversationResponse,
+    ProcessAnswerRequest,
+    ProcessAnswerResponse,
+    LessonPlanListResponse,
+    LessonPlan
+)
 
 # 创建教学路由器
 router = APIRouter(
@@ -24,97 +32,48 @@ router = APIRouter(
 )
 
 
-# 请求/响应模型
-class StartConversationRequest:
-    """开始对话请求（空请求体）"""
-    pass
-
-
-class StartConversationResponse:
-    """开始对话响应"""
-    def __init__(self, session_id: str, question_card: dict):
-        self.session_id = session_id
-        self.question_card = question_card
-
-
-class ProcessAnswerRequest:
-    """处理回答请求"""
-    def __init__(self, session_id: str, answer: str):
-        self.session_id = session_id
-        self.answer = answer
-
-
-class QuestionCard:
-    """问题卡片"""
-    def __init__(self, step_key: str, question: str, options: List[str], allows_free_text: bool):
-        self.step_key = step_key
-        self.question = question
-        self.options = options
-        self.allows_free_text = allows_free_text
-
-
-class LessonPlanActivityResponse:
-    """教学活动响应"""
-    def __init__(self, activity_name: str, description: str, duration: int, order_index: int):
-        self.activity_name = activity_name
-        self.description = description
-        self.duration = duration
-        self.order_index = order_index
-
-
-class LessonPlanResponse:
-    """教案响应"""
-    def __init__(self, id: int, title: str, subject: str, grade: str,
-                 teaching_objective: str, teaching_outline: str,
-                 activities: List[LessonPlanActivityResponse], created_at: str = None):
-        self.id = id
-        self.title = title
-        self.subject = subject
-        self.grade = grade
-        self.teaching_objective = teaching_objective
-        self.teaching_outline = teaching_outline
-        self.activities = activities
-        self.created_at = created_at
-
-
-class ConversationResponse:
-    """对话响应"""
-    def __init__(self, session_id: str, question_card: QuestionCard = None,
-                 status: str = None, lesson_plan: LessonPlanResponse = None):
-        self.session_id = session_id
-        self.question_card = question_card
-        self.status = status
-        self.lesson_plan = lesson_plan
+# 删除旧的类定义，因为已经移到schemas中
+# class StartConversationRequest:
+# class StartConversationResponse:
+# class ProcessAnswerRequest:
+# class QuestionCard:
+# class LessonPlanActivityResponse:
+# class LessonPlanResponse:
+# class ConversationResponse:
 
 
 @router.post(
     "/conversational/start",
+    response_model=StartConversationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="开始新备课会话",
-    description="初始化一个新的备课流程，创建会话记录并返回第一个问题"
+    description="初始化一个新的备课流程，创建会话记录并返回第一个问题。支持传统固定流程和AI动态问题生成两种模式"
 )
 async def start_conversation(
+    request: StartConversationRequest = StartConversationRequest(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> dict:
+) -> StartConversationResponse:
     """
     开始新的教学设计对话
 
     Args:
+        request: 包含use_dynamic_mode参数的请求体
         current_user: 当前登录用户
         db: 数据库会话
 
     Returns:
-        包含会话ID和第一个问题的响应
+        包含会话ID、问题卡片和模式信息的响应
     """
     try:
         teaching_service = TeachingService(db)
-        result = teaching_service.start_conversation(current_user.id)
+        result = teaching_service.start_conversation(current_user.id, request.use_dynamic_mode)
 
-        return {
-            "session_id": result["session_id"],
-            "question_card": result["question_card"]
-        }
+        return StartConversationResponse(
+            session_id=result["session_id"],
+            question_card=result["question_card"],
+            is_dynamic_mode=result["is_dynamic_mode"]
+        )
 
     except HTTPException:
         raise
@@ -127,15 +86,16 @@ async def start_conversation(
 
 @router.post(
     "/conversational/next",
+    response_model=ProcessAnswerResponse,
     status_code=status.HTTP_200_OK,
     summary="提交回答并获取下一步",
-    description="接收用户对上一个问题的回答，更新会话状态，并返回下一个问题或最终生成的教案"
+    description="接收用户对上一个问题的回答，更新会话状态，并返回下一个问题或最终生成的教案。支持传统固定流程和AI动态问题生成两种模式"
 )
 async def process_answer(
-    request: dict,  # 使用dict来接收JSON请求体
+    request: ProcessAnswerRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> dict:
+) -> ProcessAnswerResponse:
     """
     处理用户回答
 
@@ -145,22 +105,13 @@ async def process_answer(
         db: 数据库会话
 
     Returns:
-        下一个问题或最终教案的响应
+        下一个问题或最终教案的响应，包含模式信息
     """
     try:
-        session_id = request.get("session_id")
-        answer = request.get("answer")
-
-        if not session_id or not answer:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="缺少必需参数：session_id 或 answer"
-            )
-
         teaching_service = TeachingService(db)
-        result = await teaching_service.process_answer(session_id, answer)
+        result = await teaching_service.process_answer(request.session_id, request.answer)
 
-        return result
+        return ProcessAnswerResponse(**result)
 
     except HTTPException:
         raise
@@ -173,7 +124,7 @@ async def process_answer(
 
 @router.get(
     "/lesson-plans",
-    response_model=List[dict],
+    response_model=List[LessonPlanListResponse],
     status_code=status.HTTP_200_OK,
     summary="获取教案列表",
     description="获取当前用户的所有教案列表"
@@ -181,7 +132,7 @@ async def process_answer(
 async def get_lesson_plans(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> List[dict]:
+) -> List[LessonPlanListResponse]:
     """
     获取用户的教案列表
 
@@ -194,7 +145,9 @@ async def get_lesson_plans(
     """
     try:
         teaching_service = TeachingService(db)
-        return teaching_service.get_lesson_plans(current_user.id)
+        lesson_plans = teaching_service.get_lesson_plans(current_user.id)
+        
+        return [LessonPlanListResponse(**plan) for plan in lesson_plans]
 
     except HTTPException:
         raise
@@ -207,7 +160,7 @@ async def get_lesson_plans(
 
 @router.get(
     "/lesson-plans/{plan_id}",
-    response_model=dict,
+    response_model=LessonPlan,
     status_code=status.HTTP_200_OK,
     summary="获取单个教案详情",
     description="获取指定教案的详细信息"
@@ -216,7 +169,7 @@ async def get_lesson_plan(
     plan_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> dict:
+) -> LessonPlan:
     """
     获取单个教案详情
 
@@ -238,7 +191,7 @@ async def get_lesson_plan(
                 detail="教案不存在"
             )
 
-        return lesson_plan
+        return LessonPlan(**lesson_plan)
 
     except HTTPException:
         raise
