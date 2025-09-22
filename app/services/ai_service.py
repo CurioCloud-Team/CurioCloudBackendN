@@ -20,6 +20,11 @@ class AIService:
         self.default_model = settings.openrouter_default_model
         self.max_retries = settings.llm_max_retries
         self.timeout = settings.llm_timeout_seconds
+        
+        # Tavily搜索配置
+        self.tavily_api_key = settings.tavily_api_key
+        self.tavily_base_url = settings.tavily_base_url
+        self.tavily_search_max_results = settings.tavily_search_max_results
 
     async def _make_api_call(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -71,7 +76,65 @@ class AIService:
             print(f"清理后的AI响应内容: {content[:200]}...")
             return None
 
-    async def generate_lesson_plan(self, lesson_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def search_web(self, query: str, max_results: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """
+        使用Tavily API进行网页搜索
+
+        Args:
+            query: 搜索查询
+            max_results: 最大结果数量，默认使用配置的值
+
+        Returns:
+            搜索结果字典，包含结果列表和元数据
+        """
+        if max_results is None:
+            max_results = self.tavily_search_max_results
+
+        payload = {
+            "api_key": self.tavily_api_key,
+            "query": query,
+            "search_depth": "advanced",
+            "include_images": False,
+            "include_answer": False,
+            "include_raw_content": False,
+            "max_results": max_results,
+            "include_domains": [],
+            "exclude_domains": []
+        }
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(
+                        f"{self.tavily_base_url}/search",
+                        json=payload,
+                        headers=headers
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        # 添加搜索结果的元数据
+                        if "results" in result:
+                            result["search_metadata"] = {
+                                "query": query,
+                                "total_results": len(result["results"]),
+                                "sources": [r.get("url", "") for r in result["results"]]
+                            }
+                        return result
+                    else:
+                        print(f"Tavily搜索请求失败 (尝试 {attempt + 1}/{self.max_retries}): {response.status_code}")
+                        print(f"响应内容: {response.text}")
+                        continue
+            except Exception as e:
+                print(f"Tavily搜索请求异常 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
+                continue
+        return None
+
+    async def generate_lesson_plan(self, lesson_data: Dict[str, Any], enable_web_search: bool = False) -> Optional[Dict[str, Any]]:
         """
         生成教学计划
 
@@ -83,11 +146,18 @@ class AIService:
                     "topic": "光合作用",
                     "duration_minutes": 45
                 }
+            enable_web_search: 是否启用联网搜索
 
         Returns:
             生成的教学计划字典，如果失败返回None
         """
-        prompt = self._build_prompt(lesson_data)
+        # 如果启用联网搜索，先搜索相关信息
+        search_results = None
+        if enable_web_search:
+            search_query = self._build_search_query(lesson_data)
+            search_results = await self.search_web(search_query)
+        
+        prompt = self._build_prompt(lesson_data, search_results)
         payload = {
             "model": self.default_model,
             "messages": [{"role": "user", "content": prompt}],
@@ -100,7 +170,22 @@ class AIService:
             content = result["choices"][0]["message"]["content"]
             lesson_plan = self._clean_and_parse_json(content)
             if lesson_plan:
-                return self._validate_lesson_plan(lesson_plan)
+                validated_plan = self._validate_lesson_plan(lesson_plan)
+                # 如果有搜索结果，添加到返回的数据中
+                if search_results and "search_metadata" in search_results:
+                    validated_plan["web_search_info"] = {
+                        "used_web_search": True,
+                        "search_query": search_results["search_metadata"]["query"],
+                        "total_sources": search_results["search_metadata"]["total_results"],
+                        "sources": search_results["search_metadata"]["sources"]
+                    }
+                else:
+                    validated_plan["web_search_info"] = {
+                        "used_web_search": False,
+                        "total_sources": 0,
+                        "sources": []
+                    }
+                return validated_plan
         return None
 
     async def generate_multiple_choice_questions(self, content: str, num_questions: int, difficulty: str) -> Optional[list[Dict[str, Any]]]:
@@ -187,12 +272,41 @@ class AIService:
                 return questions
         return None
 
-    def _build_prompt(self, lesson_data: Dict[str, Any]) -> str:
+    def _build_search_query(self, lesson_data: Dict[str, Any]) -> str:
+        """
+        构建搜索查询
+
+        Args:
+            lesson_data: 课程数据
+
+        Returns:
+            搜索查询字符串
+        """
+        subject = self._extract_subject_from_data(lesson_data)
+        grade = self._extract_grade_from_data(lesson_data)
+        topic = lesson_data.get("topic", "")
+        
+        # 构建基础搜索查询
+        query_parts = []
+        if subject:
+            query_parts.append(subject)
+        if grade:
+            query_parts.append(grade)
+        if topic:
+            query_parts.append(topic)
+        
+        # 添加教学相关的关键词
+        query_parts.extend(["教学设计", "教学方法", "教学活动", "教学资源"])
+        
+        return " ".join(query_parts)
+
+    def _build_prompt(self, lesson_data: Dict[str, Any], search_results: Optional[Dict[str, Any]] = None) -> str:
         """
         构建AI提示词
 
         Args:
             lesson_data: 课程数据
+            search_results: 联网搜索结果
 
         Returns:
             完整的提示词字符串
@@ -206,6 +320,17 @@ class AIService:
         # 分析动态收集的数据
         dynamic_info = self._extract_dynamic_info(lesson_data)
         
+        # 处理搜索结果
+        search_info = ""
+        if search_results and "results" in search_results:
+            search_info = "\n\n# 联网搜索结果参考\n"
+            search_info += f"基于以下 {len(search_results['results'])} 个网页的搜索结果来优化教学设计：\n"
+            for i, result in enumerate(search_results["results"][:3], 1):  # 只显示前3个结果
+                title = result.get("title", "无标题")
+                url = result.get("url", "")
+                content = result.get("content", "")[:200] + "..." if len(result.get("content", "")) > 200 else result.get("content", "")
+                search_info += f"{i}. {title}\n   链接: {url}\n   内容摘要: {content}\n\n"
+        
         # 构建增强的提示词
         base_prompt = f"""你是一位经验丰富的{grade}{subject}教学设计师。请根据以下要求，为一堂{duration}分钟的课程设计一个完整的教学方案。
 
@@ -216,7 +341,7 @@ class AIService:
 - 课程时长: {duration}分钟
 
 # 收集到的详细信息
-{dynamic_info}
+{dynamic_info}{search_info}
 
 # 任务要求
 请生成一个结构化的教学计划，必须严格遵循以下的 JSON 格式。不要在 JSON 之外添加任何解释性文字。
@@ -262,7 +387,8 @@ class AIService:
 2. 根据收集到的学生特点和教学需求调整活动设计
 3. 体现教学方法的多样性和针对性
 4. 确保学习目标与活动内容高度匹配
-5. 考虑学生的认知水平和兴趣特点"""
+5. 考虑学生的认知水平和兴趣特点
+6. 如有联网搜索结果，请参考这些信息来丰富教学内容和方法"""
 
         return base_prompt
     

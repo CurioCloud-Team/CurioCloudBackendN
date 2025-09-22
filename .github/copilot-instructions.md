@@ -76,8 +76,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - Run tests: `pytest tests/ -v` or `pytest tests/test_specific.py::TestClass::test_method -v`
 
 ### Database Operations
-- No migrations setup - tables created via `create_tables()` in startup lifespan
-- Development uses MySQL with PyMySQL driver
+- Migrations are handled by `Alembic`. Use `alembic revision --autogenerate` and `alembic upgrade head`.
+- For initial setup or testing, tables can be created via `create_tables()` in the startup lifespan event (`main.py`).
+- Development uses MySQL with PyMySQL driver.
 - Connection string format: `mysql+pymysql://user:pass@host:port/db`
 
 ## Integration Points
@@ -102,6 +103,8 @@ DATABASE_USER=username
 DATABASE_PASSWORD=password
 DATABASE_NAME=curio_cloud
 JWT_SECRET_KEY=your_secret_key
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ## Key Files for Context

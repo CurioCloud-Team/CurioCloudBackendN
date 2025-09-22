@@ -55,6 +55,7 @@ class LessonPlan(BaseModel):
     teaching_outline: str = Field(description="教学大纲")
     activities: List[LessonPlanActivity] = Field(description="教学活动列表")
     created_at: Optional[datetime] = Field(description="创建时间")
+    web_search_info: Optional[Dict[str, Any]] = Field(default=None, description="联网搜索信息")
 
 
 class ProcessAnswerResponse(BaseModel):
