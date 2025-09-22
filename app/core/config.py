@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     llm_max_retries: int = 3
     llm_timeout_seconds: int = 120
     
+    # Tavily搜索配置
+    tavily_api_key: str
+    tavily_base_url: str = "https://api.tavily.com"
+    tavily_search_max_results: int = 5
+    
     class Config:
         """Pydantic配置"""
         env_file = ".env"

@@ -329,12 +329,13 @@ class TeachingService:
             print(f"保存教案失败: {type(e).__name__}: {e}")
             raise
 
-    def _format_lesson_plan_response(self, lesson_plan: LessonPlan) -> Dict[str, Any]:
+    def _format_lesson_plan_response(self, lesson_plan: LessonPlan, web_search_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         格式化教案响应
 
         Args:
             lesson_plan: LessonPlan对象
+            web_search_info: 联网搜索信息
 
         Returns:
             格式化的响应字典
@@ -348,7 +349,7 @@ class TeachingService:
                 "order_index": activity.order_index
             })
 
-        return {
+        response = {
             "id": lesson_plan.id,
             "title": lesson_plan.title,
             "subject": lesson_plan.subject,
@@ -358,6 +359,11 @@ class TeachingService:
             "activities": sorted(activities, key=lambda x: x['order_index']),
             "created_at": lesson_plan.created_at.isoformat() if lesson_plan.created_at else None
         }
+
+        if web_search_info:
+            response["web_search_info"] = web_search_info
+
+        return response
 
     def _get_dynamic_first_question(self) -> Dict[str, Any]:
         """
@@ -508,7 +514,7 @@ class TeachingService:
         self.db.commit()
 
         # 调用AI服务生成教案
-        lesson_plan_data = await self.ai_service.generate_lesson_plan(session.collected_data)
+        lesson_plan_data = await self.ai_service.generate_lesson_plan(session.collected_data, enable_web_search=True)
 
         if lesson_plan_data:
             # 保存教案到数据库
@@ -521,7 +527,7 @@ class TeachingService:
                 "session_id": session.session_id,
                 "status": "completed",
                 "is_dynamic_mode": session.current_step.startswith('dynamic_question_'),
-                "lesson_plan": self._format_lesson_plan_response(lesson_plan)
+                "lesson_plan": self._format_lesson_plan_response(lesson_plan, lesson_plan_data.get("web_search_info"))
             }
         else:
             session.status = SessionStatus.failed
