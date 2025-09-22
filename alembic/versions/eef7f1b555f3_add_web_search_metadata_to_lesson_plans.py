@@ -17,8 +17,10 @@ depends_on = None
 
 
 def upgrade():
-    pass
+    # 添加web_search_info字段到lesson_plans表
+    op.add_column('lesson_plans', sa.Column('web_search_info', sa.JSON(), nullable=True, comment='联网搜索结果信息'))
 
 
 def downgrade():
-    pass
+    # 删除web_search_info字段
+    op.drop_column('lesson_plans', 'web_search_info')

@@ -306,7 +306,8 @@ class TeachingService:
                 subject=subject,
                 grade=grade,
                 teaching_objective='\n'.join(lesson_plan_data['learning_objectives']),
-                teaching_outline=lesson_plan_data['teaching_outline']
+                teaching_outline=lesson_plan_data['teaching_outline'],
+                web_search_info=lesson_plan_data.get('web_search_info')
             )
 
             self.db.add(lesson_plan)
@@ -335,7 +336,7 @@ class TeachingService:
 
         Args:
             lesson_plan: LessonPlan对象
-            web_search_info: 联网搜索信息
+            web_search_info: 联网搜索信息（如果未提供，从数据库中读取）
 
         Returns:
             格式化的响应字典
@@ -360,8 +361,10 @@ class TeachingService:
             "created_at": lesson_plan.created_at.isoformat() if lesson_plan.created_at else None
         }
 
-        if web_search_info:
-            response["web_search_info"] = web_search_info
+        # 使用提供的web_search_info，或者从数据库中读取
+        search_info = web_search_info or lesson_plan.web_search_info
+        if search_info:
+            response["web_search_info"] = search_info
 
         return response
 

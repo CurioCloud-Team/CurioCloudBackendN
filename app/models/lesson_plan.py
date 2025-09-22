@@ -3,7 +3,7 @@
 
 定义教学计划相关的数据库表结构
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -31,6 +31,9 @@ class LessonPlan(Base):
     # 教学内容
     teaching_objective = Column(Text, comment="学习目标")
     teaching_outline = Column(Text, comment="教学大纲/简介")
+
+    # 联网搜索信息
+    web_search_info = Column(JSON, comment="联网搜索结果信息")
 
     # 时间戳
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
