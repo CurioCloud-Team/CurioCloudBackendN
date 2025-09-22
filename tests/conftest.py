@@ -73,6 +73,18 @@ def test_user_data():
 
 
 @pytest.fixture
+def sample_user_data():
+    """示例用户数据"""
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "password": "Test123!@#",
+        "confirm_password": "Test123!@#",
+        "full_name": "测试用户"
+    }
+
+
+@pytest.fixture
 def sample_login_data():
     """示例登录数据"""
     return {
