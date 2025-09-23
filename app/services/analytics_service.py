@@ -182,3 +182,28 @@ class AnalyticsService:
             raise HTTPException(status_code=404, detail="报告未找到或无权访问")
             
         return report
+
+    def get_all_analysis_reports_for_user(self, user_id: int):
+        """获取指定用户的所有分析报告条目"""
+        reports = self.db.query(AnalysisReport).filter(
+            AnalysisReport.user_id == user_id
+        ).order_by(AnalysisReport.created_at.desc()).all()
+
+        if not reports:
+            return []
+
+        # 转换为 Pydantic Schema
+        report_entries = []
+        for report in reports:
+            # 创建一个简短的摘要预览
+            summary_preview = report.summary.split('\n')[0]
+            if len(summary_preview) > 50:
+                summary_preview = summary_preview[:50] + "..."
+
+            report_entries.append({
+                "analysis_id": report.analysis_id,
+                "summary_preview": summary_preview,
+                "created_at": report.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+            
+        return report_entries

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.analytics_service import AnalyticsService
-from app.schemas.analytics import GradeUploadResponse, AnalysisReportResponse
+from app.schemas.analytics import GradeUploadResponse, AnalysisReportResponse, AnalysisReportEntry
+from typing import List
 from app.models.user import User
 from app.dependencies.auth import get_current_active_user
 
@@ -55,3 +56,16 @@ def get_analysis_report(
         },
         "message": "报告获取成功"
     }
+
+@router.get("/reports", response_model=List[AnalysisReportEntry])
+def get_all_user_reports(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    获取当前用户的所有历史分析报告列表。
+    - **Response Body**: 返回一个包含所有历史报告摘要的列表。
+    """
+    service = AnalyticsService(db)
+    reports = service.get_all_analysis_reports_for_user(user_id=current_user.id)
+    return reports

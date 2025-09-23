@@ -27,3 +27,9 @@ class AnalysisReportInDB(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AnalysisReportEntry(BaseModel):
+    analysis_id: str
+    summary_preview: str
+    created_at: str
+    message: str = "历史报告条目"
