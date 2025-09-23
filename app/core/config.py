@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     tavily_base_url: str = "https://api.tavily.com"
     tavily_search_max_results: int = 5
     
+    # LandPPT集成配置
+    landppt_base_url: str = "http://localhost:8001"
+    landppt_api_key: Optional[str] = None
+    landppt_default_scenario: str = "education"
+    
     class Config:
         """Pydantic配置"""
         env_file = ".env"

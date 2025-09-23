@@ -86,3 +86,27 @@ class SessionInfo(BaseModel):
     current_step: Optional[str] = Field(description="当前步骤")
     collected_data: Dict[str, Any] = Field(description="收集的数据")
     created_at: datetime = Field(description="创建时间")
+
+
+class PPTGenerationResponse(BaseModel):
+    """PPT生成响应"""
+    success: bool = Field(description="是否成功")
+    ppt_project_id: Optional[str] = Field(description="PPT项目ID")
+    ppt_title: Optional[str] = Field(description="PPT标题")
+    ppt_scenario: Optional[str] = Field(description="PPT场景")
+    message: str = Field(description="响应消息")
+
+
+class PPTStatusResponse(BaseModel):
+    """PPT状态响应"""
+    ppt_project_id: str = Field(description="PPT项目ID")
+    status: Dict[str, Any] = Field(description="PPT状态信息")
+
+
+class PPTSlidesResponse(BaseModel):
+    """PPT幻灯片响应"""
+    project_id: str = Field(description="项目ID")
+    title: str = Field(description="标题")
+    slides_html: Optional[str] = Field(description="幻灯片HTML")
+    slides_data: List[Dict[str, Any]] = Field(description="幻灯片数据")
+    slides_count: int = Field(description="幻灯片数量")
