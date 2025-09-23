@@ -163,7 +163,12 @@ class AnalyticsService:
             user_id=user_id,
             summary=summary_text,
             charts_data=charts_data,
-            knowledge_gaps=ai_insights_json.get("knowledge_gaps", [])
+            knowledge_gaps=ai_insights_json.get("knowledge_gaps", []),
+            # 保存新的统计数据
+            average_score=analysis_data.get("average_score"),
+            failing_students_count=analysis_data.get("failing_students_count"),
+            failing_students_list=analysis_data.get("failing_students_list"),
+            knowledge_point_error_rates=analysis_data.get("knowledge_point_error_rates")
         )
         
         self.db.add(new_report)
@@ -181,7 +186,21 @@ class AnalyticsService:
         if not report:
             raise HTTPException(status_code=404, detail="报告未找到或无权访问")
             
-        return report
+        # 将存储的数据组装成符合新Schema的格式
+        return {
+            "analysis_id": report.analysis_id,
+            "summary": report.summary,
+            "report": {
+                "charts_data": report.charts_data,
+                "knowledge_gaps": report.knowledge_gaps,
+                "statistics": {
+                    "average_score": report.average_score,
+                    "failing_students_count": report.failing_students_count,
+                    "failing_students_list": report.failing_students_list,
+                    "knowledge_point_error_rates": report.knowledge_point_error_rates
+                }
+            }
+        }
 
     def get_all_analysis_reports_for_user(self, user_id: int):
         """获取指定用户的所有分析报告条目"""

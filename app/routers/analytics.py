@@ -47,15 +47,7 @@ def get_analysis_report(
     service = AnalyticsService(db)
     report = service.get_analysis_report(analysis_id=analysis_id, user_id=current_user.id)
     
-    return {
-        "analysis_id": report.analysis_id,
-        "summary": report.summary,
-        "report": {
-            "charts_data": report.charts_data,
-            "knowledge_gaps": report.knowledge_gaps
-        },
-        "message": "报告获取成功"
-    }
+    return report
 
 @router.get("/reports", response_model=List[AnalysisReportEntry])
 def get_all_user_reports(

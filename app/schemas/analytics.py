@@ -7,9 +7,16 @@ class GradeUploadResponse(BaseModel):
     summary: str
     message: str = "文件上传成功并已开始分析"
 
+class StatisticsData(BaseModel):
+    average_score: str
+    failing_students_count: int
+    failing_students_list: List[str]
+    knowledge_point_error_rates: Dict[str, str]
+
 class ReportData(BaseModel):
     charts_data: List[Dict[str, Any]]
     knowledge_gaps: List[Dict[str, Any]]
+    statistics: StatisticsData
 
 class AnalysisReportResponse(BaseModel):
     analysis_id: str
