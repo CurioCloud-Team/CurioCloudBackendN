@@ -55,14 +55,16 @@ class AnalyticsService:
         请提供结构化的JSON输出，包含'knowledge_gaps'和'teaching_suggestions'两个键。
         """
         try:
-            response = await self.ai_service.generate_text(prompt, use_gemini=True)
-            # 假设AI返回的是JSON字符串
+            response_str = await self.ai_service.generate_text(prompt, use_gemini=True)
+            # 假设AI返回的是JSON字符串, 解析它
+            import json
+            response = json.loads(response_str)
             return response
         except Exception as e:
-            # 在AI调用失败时提供一个默认的、信息丰富的建议
+            # 在AI调用失败时提供一个默认的、信息丰富的建议，并符合预期的列表格式
             return {
-                "knowledge_gaps": "AI分析失败，无法生成知识差距评估。请检查数据或稍后重试。",
-                "teaching_suggestions": "由于AI分析失败，无法提供教学建议。建议重点关注错误率较高的知识点，并为不及格学生提供额外辅导。"
+                "knowledge_gaps": [{"gap": "AI分析失败", "suggestion": f"无法生成知识差距评估，请检查输入数据或稍后重试。错误: {e}"}],
+                "teaching_suggestions": [{"suggestion": "由于AI分析失败，无法提供教学建议。", "details": "建议重点关注错误率较高的知识点，并为不及格学生提供额外辅导。"}]
             }
 
 
@@ -74,16 +76,27 @@ class AnalyticsService:
         
         # 创建图表所需的数据
         charts_data = [
-            {"type": "bar", "title": "分数分布", "data": df['分数'].value_counts().to_dict()},
+            {"type": "bar", "title": "分数分布", "data": {str(k): v for k, v in df['分数'].value_counts().to_dict().items()}},
             {"type": "pie", "title": "知识点错误率", "data": analysis_data.get("knowledge_point_error_rates", {})}
         ]
+
+        # 从AI结果中提取或生成摘要
+        summary_text = "AI分析摘要：\n"
+        if "knowledge_gaps" in ai_insights_json and isinstance(ai_insights_json["knowledge_gaps"], list) and ai_insights_json["knowledge_gaps"]:
+            # 将知识点差距的第一个作为摘要
+            first_gap = ai_insights_json["knowledge_gaps"][0]
+            summary_text += f"- 主要问题: {first_gap.get('gap', '未明确')}\n"
+            summary_text += f"- 初步建议: {first_gap.get('suggestion', '无')}"
+        else:
+            summary_text = "AI分析失败或未返回有效数据，无法生成摘要。"
+
 
         new_report = AnalysisReport(
             analysis_id=str(uuid.uuid4()),
             user_id=user_id,
-            summary=ai_insights_json.get("knowledge_gaps", "无摘要"), # 使用AI生成的部分内容作为摘要
+            summary=summary_text,
             charts_data=charts_data,
-            knowledge_gaps=ai_insights_json
+            knowledge_gaps=ai_insights_json.get("knowledge_gaps", [])
         )
         
         self.db.add(new_report)
