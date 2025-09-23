@@ -100,6 +100,24 @@ class TestUserRegistration:
         response = client.post("/api/auth/register", json=weak_password_data)
         assert response.status_code == 422
     
+    def test_password_without_special_chars_registration(self, client: TestClient, sample_user_data):
+        """测试无特殊字符密码注册（新规则下应该成功）"""
+        no_special_chars_data = sample_user_data.copy()
+        no_special_chars_data.update({
+            "username": "nospecialuser",
+            "email": "nospecial@example.com",
+            "password": "Test12345",  # 包含字母和数字，但无特殊字符
+            "confirm_password": "Test12345"
+        })
+        
+        response = client.post("/api/auth/register", json=no_special_chars_data)
+        assert response.status_code == 201
+        
+        data = response.json()
+        assert "user" in data
+        assert "token" in data
+        assert data["message"] == "注册成功"
+    
     def test_password_mismatch_registration(self, client: TestClient, sample_user_data):
         """测试密码不匹配注册"""
         mismatch_data = sample_user_data.copy()

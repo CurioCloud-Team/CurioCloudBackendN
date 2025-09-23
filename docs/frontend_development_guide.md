@@ -272,8 +272,8 @@ const RegisterForm = ({ onSuccess, onSwitchToLogin }) => {
             newErrors.password = '密码不能为空';
         } else if (formData.password.length < 8) {
             newErrors.password = '密码至少8个字符';
-        } else if (!/(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) {
-            newErrors.password = '密码必须包含字母、数字和特殊字符';
+        } else if (!/(?=.*[A-Za-z])(?=.*\d)/.test(formData.password)) {
+            newErrors.password = '密码必须包含字母和数字';
         }
 
         // 确认密码验证

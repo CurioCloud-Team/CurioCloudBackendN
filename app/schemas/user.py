@@ -35,8 +35,6 @@ class UserCreate(UserBase):
             raise ValueError('密码必须包含至少一个字母')
         if not re.search(r'\d', v):
             raise ValueError('密码必须包含至少一个数字')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
-            raise ValueError('密码必须包含至少一个特殊字符')
         return v
     
     @validator('confirm_password')
