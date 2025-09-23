@@ -13,6 +13,7 @@ from app.routers import auth_router, exercise_router
 from app.routers.user import router as user_router
 from app.routers.teaching import router as teaching_router
 from app.routers.session import router as session_router
+from app.routers.analytics import router as analytics_router
 
 
 @asynccontextmanager
@@ -63,6 +64,7 @@ app.include_router(user_router)
 app.include_router(teaching_router)
 app.include_router(session_router)
 app.include_router(exercise_router)
+app.include_router(analytics_router, prefix="/api/analytics", tags=["学情分析"])
 
 
 @app.get("/", tags=["根路径"])

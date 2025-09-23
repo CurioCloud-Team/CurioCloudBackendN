@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 120
     
     # Tavily搜索配置
-    tavily_api_key: str
+    tavily_api_key: Optional[str] = None
     tavily_base_url: str = "https://api.tavily.com"
     tavily_search_max_results: int = 5
     
