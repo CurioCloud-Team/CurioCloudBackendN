@@ -165,10 +165,9 @@ class AnalyticsService:
 
         report_entries = []
         for report in reports:
-            # 从完整的Markdown报告中提取第一行作为预览
-            summary_preview = report.summary.split('\n')[0].replace('#', '').strip()
-            if len(summary_preview) > 60:
-                summary_preview = summary_preview[:60] + "..."
+            summary_preview = report.summary
+            if len(summary_preview) > 50:
+                summary_preview = summary_preview[:50] + "..."
 
             report_entries.append({
                 "analysis_id": report.analysis_id,
