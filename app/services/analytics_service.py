@@ -102,7 +102,8 @@ class AnalyticsService:
             return report_text
         except Exception as e:
             # 在生产环境中，这里应该有更完善的日志记录
-            return f"生成AI分析报告时发生错误: {e}"
+            # 将底层异常包装成HTTPException，以便将清晰的错误信息传递给上层调用者
+            raise HTTPException(status_code=502, detail=f"AI报告生成失败: {e}")
 
 
     async def process_grades_file(self, file: UploadFile, user_id: int):
