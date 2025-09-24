@@ -15,15 +15,15 @@ class AnalysisReport(Base):
     analysis_id = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()), comment="用于API交互的唯一ID")
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="上传该报告的用户ID")
     
-    summary = Column(Text, nullable=True, comment="AI生成的自然语言分析摘要")
-    charts_data = Column(JSON, nullable=True, comment="用于图表可视化的数据")
-    knowledge_gaps = Column(JSON, nullable=True, comment="识别出的知识点差距和教学建议")
+    summary = Column(Text, nullable=True, comment="AI生成的完整叙事性分析报告（Markdown格式）")
     
-    # 新增的统计数据字段
-    average_score = Column(String(10), nullable=True, comment="班级平均分")
-    failing_students_count = Column(Integer, nullable=True, comment="不及格学生人数")
-    failing_students_list = Column(JSON, nullable=True, comment="不及格学生名单")
-    knowledge_point_error_rates = Column(JSON, nullable=True, comment="各知识点错误率")
+    # 以下字段将被废弃，但暂时保留以兼容旧数据
+    charts_data = Column(JSON, nullable=True, comment="[已废弃] 用于图表可视化的数据")
+    knowledge_gaps = Column(JSON, nullable=True, comment="[已废弃] 识别出的知识点差距和教学建议")
+    average_score = Column(String(10), nullable=True, comment="[已废弃] 班级平均分")
+    failing_students_count = Column(Integer, nullable=True, comment="[已废弃] 不及格学生人数")
+    failing_students_list = Column(JSON, nullable=True, comment="[已废弃] 不及格学生名单")
+    knowledge_point_error_rates = Column(JSON, nullable=True, comment="[已废弃] 各知识点错误率")
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
 

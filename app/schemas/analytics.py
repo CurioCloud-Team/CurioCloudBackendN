@@ -4,25 +4,14 @@ import uuid
 
 class GradeUploadResponse(BaseModel):
     analysis_id: str
-    summary: str
-    message: str = "文件上传成功并已开始分析"
-
-class StatisticsData(BaseModel):
-    average_score: str
-    failing_students_count: int
-    failing_students_list: List[str]
-    knowledge_point_error_rates: Dict[str, str]
-
-class ReportData(BaseModel):
-    charts_data: List[Dict[str, Any]]
-    knowledge_gaps: List[Dict[str, Any]]
-    statistics: StatisticsData
+    summary_preview: str # 返回报告的第一行作为预览
+    message: str = "文件上传成功，AI正在生成分析报告..."
 
 class AnalysisReportResponse(BaseModel):
     analysis_id: str
-    summary: str
-    report: ReportData
+    full_report_markdown: str # 完整的Markdown格式报告
     message: str = "报告获取成功"
+
 
 class AnalysisReportInDB(BaseModel):
     id: int

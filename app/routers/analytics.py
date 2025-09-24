@@ -17,9 +17,9 @@ async def upload_grades_for_analysis(
     file: UploadFile = File(...)
 ):
     """
-    上传学生成绩Excel文件进行分析。
+    上传任何学生相关的Excel文件进行智能分析。
     - **Request Body**: 需要一个multipart/form-data请求，其中包含一个名为'file'的Excel文件。
-    - **Response Body**: 返回一个包含分析ID和初步摘要的JSON对象。
+    - **Response Body**: 返回一个包含分析ID和报告预览的JSON对象。
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="无效的文件类型，请上传Excel文件 (.xlsx, .xls)")
@@ -27,10 +27,13 @@ async def upload_grades_for_analysis(
     service = AnalyticsService(db)
     report = await service.process_grades_file(file=file, user_id=current_user.id)
     
+    # 提取报告的第一行作为预览
+    summary_preview = report.summary.split('\n')[0].replace('#', '').strip()
+
     return {
         "analysis_id": report.analysis_id,
-        "summary": report.summary,
-        "message": "文件上传成功，分析已完成"
+        "summary_preview": summary_preview,
+        "message": "文件上传成功，AI分析已完成"
     }
 
 @router.get("/report/{analysis_id}", response_model=AnalysisReportResponse)
@@ -40,14 +43,19 @@ def get_analysis_report(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    根据分析ID获取详细的学情分析报告。
+    根据分析ID获取完整的叙事性学情分析报告。
     - **Path Parameter**: `analysis_id` 是上传文件后返回的唯一ID。
-    - **Response Body**: 返回包含图表数据和知识点差距分析的完整报告。
+    - **Response Body**: 返回包含完整Markdown格式报告的JSON对象。
     """
     service = AnalyticsService(db)
-    report = service.get_analysis_report(analysis_id=analysis_id, user_id=current_user.id)
+    report_data = service.get_analysis_report(analysis_id=analysis_id, user_id=current_user.id)
     
-    return report
+    return {
+        "analysis_id": report_data["analysis_id"],
+        "full_report_markdown": report_data["summary"],
+        "message": "报告获取成功"
+    }
+
 
 @router.get("/reports", response_model=List[AnalysisReportEntry])
 def get_all_user_reports(
