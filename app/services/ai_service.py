@@ -542,3 +542,62 @@ class AIService:
                     raise ValueError(f"活动 {i+1} 缺少字段: {key}")
 
         return lesson_plan
+
+    async def identify_subject(self, user_input: str) -> str:
+        """
+        使用AI智能识别用户输入的学科
+        
+        Args:
+            user_input: 用户输入的文本
+            
+        Returns:
+            识别出的学科名称
+        """
+        prompt = f"""
+请分析用户输入的内容，智能识别其中的学科信息。
+
+用户输入："{user_input}"
+
+请根据以下规则进行识别：
+1. 如果是编程语言（如Go、Rust、Python、Java、C++等），直接返回该编程语言名称
+2. 如果是传统学科（如数学、语文、英语、物理、化学等），返回对应的学科名称
+3. 如果是复合描述（如"Rust程序设计语言"、"Go语言编程"），提取核心的编程语言名称
+4. 如果是专业课程（如"数据结构与算法"、"计算机网络"、"操作系统"等），返回具体的课程名称
+5. 如果无法明确识别，返回最接近的学科分类
+
+请直接返回学科名称，不要包含任何解释或额外文字。
+
+示例：
+- 输入"go语言" → 输出"Go"
+- 输入"Rust程序设计语言" → 输出"Rust"
+- 输入"Python编程基础" → 输出"Python"
+- 输入"数据结构与算法" → 输出"数据结构与算法"
+- 输入"高等数学" → 输出"数学"
+- 输入"英语口语" → 输出"英语"
+"""
+
+        payload = {
+            "model": self.default_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.1,  # 使用较低的温度以获得更一致的结果
+            "max_tokens": 50
+        }
+
+        try:
+            response = await self._make_api_call(payload)
+            if response and 'choices' in response and len(response['choices']) > 0:
+                subject = response['choices'][0]['message']['content'].strip()
+                # 清理可能的引号和多余字符
+                subject = subject.strip('"\'').strip()
+                return subject if subject else user_input
+            else:
+                print(f"AI学科识别失败，使用原始输入: {user_input}")
+                return user_input
+        except Exception as e:
+            print(f"AI学科识别出错: {e}")
+            return user_input
