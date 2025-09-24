@@ -280,8 +280,14 @@ async def generate_ppt_from_lesson_plan(
                 detail="教案不存在"
             )
 
-        # 调用LandPPT服务生成PPT
-        landppt_service = LandPPTService()
+        # 调用LandPPT服务生成PPT - 使用用户的API Key
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
         result = await landppt_service.create_ppt_from_lesson_plan(lesson_plan)
 
         return PPTGenerationResponse(**result)
@@ -316,7 +322,13 @@ async def get_ppt_generation_status(
         PPT状态信息
     """
     try:
-        landppt_service = LandPPTService()
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
         status_info = await landppt_service.get_ppt_status(ppt_project_id)
 
         return PPTStatusResponse(
@@ -354,7 +366,13 @@ async def get_ppt_slides(
         PPT幻灯片数据
     """
     try:
-        landppt_service = LandPPTService()
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
         slides_data = await landppt_service.get_ppt_slides(ppt_project_id)
 
         return PPTSlidesResponse(**slides_data)
@@ -396,7 +414,13 @@ async def export_ppt_file(
                 detail="不支持的导出格式，仅支持 pdf 和 pptx"
             )
 
-        landppt_service = LandPPTService()
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
         file_data = await landppt_service.export_ppt(ppt_project_id, export_format)
 
         # 返回文件响应

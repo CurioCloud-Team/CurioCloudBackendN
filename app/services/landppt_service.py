@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 class LandPPTService:
     """LandPPT服务类"""
 
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         self.base_url = settings.landppt_base_url.rstrip('/')
-        self.api_key = settings.landppt_api_key
+        self.api_key = api_key  # 动态API Key，如果为None则使用配置的默认值
         self.default_scenario = settings.landppt_default_scenario
         self.timeout = 300  # 5分钟超时，PPT生成可能需要较长时间
 
