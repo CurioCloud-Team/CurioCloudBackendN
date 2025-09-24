@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import User
 from app.services.teaching_service import TeachingService
+from app.services.landppt_service import LandPPTService
 from app.schemas.user import MessageResponse
 from app.schemas.teaching import (
     StartConversationRequest,
@@ -18,7 +19,10 @@ from app.schemas.teaching import (
     ProcessAnswerRequest,
     ProcessAnswerResponse,
     LessonPlanListResponse,
-    LessonPlan
+    LessonPlan,
+    PPTGenerationResponse,
+    PPTStatusResponse,
+    PPTSlidesResponse
 )
 
 # 创建教学路由器
@@ -237,4 +241,206 @@ async def delete_lesson_plan(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="删除教案失败，请稍后重试"
+        )
+
+
+# PPT生成功能路由
+
+@router.post(
+    "/lesson-plans/{plan_id}/generate-ppt",
+    response_model=PPTGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="从教案生成PPT",
+    description="将指定的教案发送给LandPPT服务生成对应的PPT课件"
+)
+async def generate_ppt_from_lesson_plan(
+    plan_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> PPTGenerationResponse:
+    """
+    从教案生成PPT
+
+    Args:
+        plan_id: 教案ID
+        current_user: 当前登录用户
+        db: 数据库会话
+
+    Returns:
+        生成结果消息
+    """
+    try:
+        # 获取教案
+        teaching_service = TeachingService(db)
+        lesson_plan = teaching_service.get_lesson_plan(plan_id, current_user.id)
+
+        if not lesson_plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="教案不存在"
+            )
+
+        # 调用LandPPT服务生成PPT - 使用用户的API Key
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
+        result = await landppt_service.create_ppt_from_lesson_plan(lesson_plan)
+
+        return PPTGenerationResponse(**result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PPT生成失败，请稍后重试"
+        )
+
+
+@router.get(
+    "/ppt/{ppt_project_id}/status",
+    response_model=PPTStatusResponse,
+    summary="获取PPT生成状态",
+    description="查询LandPPT中PPT项目的生成状态和进度"
+)
+async def get_ppt_generation_status(
+    ppt_project_id: str,
+    current_user: User = Depends(get_current_user)
+) -> PPTStatusResponse:
+    """
+    获取PPT生成状态
+
+    Args:
+        ppt_project_id: PPT项目ID
+        current_user: 当前登录用户
+
+    Returns:
+        PPT状态信息
+    """
+    try:
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
+        status_info = await landppt_service.get_ppt_status(ppt_project_id)
+
+        return PPTStatusResponse(
+            ppt_project_id=ppt_project_id,
+            status=status_info
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取PPT状态失败，请稍后重试"
+        )
+
+
+@router.get(
+    "/ppt/{ppt_project_id}/slides",
+    response_model=PPTSlidesResponse,
+    summary="获取PPT幻灯片内容",
+    description="获取已生成的PPT幻灯片内容和数据"
+)
+async def get_ppt_slides(
+    ppt_project_id: str,
+    current_user: User = Depends(get_current_user)
+) -> PPTSlidesResponse:
+    """
+    获取PPT幻灯片内容
+
+    Args:
+        ppt_project_id: PPT项目ID
+        current_user: 当前登录用户
+
+    Returns:
+        PPT幻灯片数据
+    """
+    try:
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+        
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
+        slides_data = await landppt_service.get_ppt_slides(ppt_project_id)
+
+        return PPTSlidesResponse(**slides_data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取PPT幻灯片失败，请稍后重试"
+        )
+
+
+@router.get(
+    "/ppt/{ppt_project_id}/export/{export_format}",
+    summary="导出PPT文件",
+    description="将生成的PPT导出为PDF或PPTX格式文件"
+)
+async def export_ppt_file(
+    ppt_project_id: str,
+    export_format: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    导出PPT文件
+
+    Args:
+        ppt_project_id: PPT项目ID
+        export_format: 导出格式 (pdf 或 pptx)
+        current_user: 当前登录用户
+
+    Returns:
+        文件下载响应
+    """
+    try:
+        if export_format not in ["pdf", "pptx"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="不支持的导出格式，仅支持 pdf 和 pptx"
+            )
+
+        if not current_user.landppt_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户未配置LandPPT API密钥，请联系管理员"
+            )
+
+        landppt_service = LandPPTService(api_key=current_user.landppt_api_key)
+        file_data = await landppt_service.export_ppt(ppt_project_id, export_format)
+
+        # 返回文件响应
+        from fastapi.responses import Response
+
+        content_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        filename = f"lesson_plan_{ppt_project_id}.{export_format}"
+
+        return Response(
+            content=file_data,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PPT导出失败，请稍后重试"
         )

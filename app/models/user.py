@@ -31,6 +31,9 @@ class User(Base):
     is_active = Column(Boolean, default=True, comment="账户是否激活")
     is_verified = Column(Boolean, default=False, comment="邮箱是否已验证")
     
+    # LandPPT集成
+    landppt_api_key = Column(String(128), comment="对应的LandPPT API密钥")
+    
     # 时间戳
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
