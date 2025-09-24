@@ -175,7 +175,7 @@ class TeachingService:
             print(f"删除教案失败: {type(e).__name__}: {e}")
             return False
 
-    def _extract_subject_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
+    async def _extract_subject_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
         """
         从收集的数据中智能提取学科信息
 
@@ -187,11 +187,41 @@ class TeachingService:
         """
         # 首先检查直接的subject字段
         if collected_data.get("subject"):
-            return collected_data["subject"]
+            # 如果已经有subject字段，也使用AI进行智能识别和标准化
+            try:
+                return await self.ai_service.identify_subject(collected_data["subject"])
+            except Exception as e:
+                print(f"AI学科识别失败，使用原始值: {e}")
+                return collected_data["subject"]
 
-    def _extract_subject_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
+        # 优先检查第一个问题的答案（通常直接询问学科）
+        first_answer = collected_data.get("question_1_answer", "")
+        if first_answer:
+            try:
+                # 使用AI智能识别学科
+                identified_subject = await self.ai_service.identify_subject(first_answer)
+                if identified_subject:
+                    return identified_subject
+            except Exception as e:
+                print(f"AI学科识别失败: {e}")
+
+        # 如果第一个问题没有匹配，检查其他问题的答案
+        for key, value in collected_data.items():
+            if key.startswith("question_") and key.endswith("_answer") and value and key != "question_1_answer":
+                try:
+                    # 使用AI智能识别学科
+                    identified_subject = await self.ai_service.identify_subject(value)
+                    if identified_subject:
+                        return identified_subject
+                except Exception as e:
+                    print(f"AI学科识别失败: {e}")
+                    continue
+
+        return ""
+
+    def _extract_subject_from_collected_data_legacy(self, collected_data: Dict[str, Any]) -> str:
         """
-        从收集的数据中智能提取学科信息
+        从收集的数据中智能提取学科信息（传统静态匹配方法，作为备用）
 
         Args:
             collected_data: 收集的用户数据
@@ -277,60 +307,45 @@ class TeachingService:
 
     def _extract_grade_from_collected_data(self, collected_data: Dict[str, Any]) -> str:
         """
-        从收集的数据中智能提取年级信息
+        从收集的数据中提取年级信息
 
         Args:
             collected_data: 收集的用户数据
 
         Returns:
-            年级信息
+            年级名称
         """
         # 首先检查直接的grade字段
         if collected_data.get("grade"):
             return collected_data["grade"]
 
-        # 从动态问题答案中提取年级信息
-        for key, value in collected_data.items():
-            if key.startswith("question_") and key.endswith("_answer") and value:
-                # 年级匹配模式 - 按照优先级排序，更具体的匹配在前
-                grade_patterns = [
-                    # 初中 - 具体年级
-                    ("初中一年级", "初中一年级"), ("初中二年级", "初中二年级"), ("初中三年级", "初中三年级"),
-                    ("初一", "初中一年级"), ("初二", "初中二年级"), ("初三", "初中三年级"),
-                    ("七年级", "初中一年级"), ("八年级", "初中二年级"), ("九年级", "初中三年级"),
-                    # 高中 - 具体年级
-                    ("高中一年级", "高中一年级"), ("高中二年级", "高中二年级"), ("高中三年级", "高中三年级"),
-                    ("高一", "高中一年级"), ("高二", "高中二年级"), ("高三", "高中三年级"),
-                    # 小学 - 具体年级
-                    ("小学一年级", "小学一年级"), ("小学二年级", "小学二年级"), ("小学三年级", "小学三年级"),
-                    ("小学四年级", "小学四年级"), ("小学五年级", "小学五年级"), ("小学六年级", "小学六年级"),
-                    # 大学 - 具体年级
-                    ("大学一年级", "大学一年级"), ("大学二年级", "大学二年级"), ("大学三年级", "大学三年级"), ("大学四年级", "大学四年级"),
-                    ("大一", "大学一年级"), ("大二", "大学二年级"), ("大三", "大学三年级"), ("大四", "大学四年级"),
-                    # 研究生
-                    ("研究生一年级", "研究生一年级"), ("研究生二年级", "研究生二年级"), ("研究生三年级", "研究生三年级"),
-                    ("硕士一年级", "研究生一年级"), ("硕士二年级", "研究生二年级"), ("硕士三年级", "研究生三年级"),
-                    ("博士一年级", "博士一年级"), ("博士二年级", "博士二年级"), ("博士三年级", "博士三年级"),
-                    # 通用年级（只有在没有学段前缀时才匹配）
-                    ("一年级", "小学一年级"), ("二年级", "小学二年级"), ("三年级", "小学三年级"),
-                    ("四年级", "小学四年级"), ("五年级", "小学五年级"), ("六年级", "小学六年级"),
-                    # 学段（最后匹配）
-                    ("初中", "初中"), ("高中", "高中"), ("小学", "小学"), ("大学", "大学"), ("研究生", "研究生"),
-                    # 成人教育和职业培训
-                    ("成人", "成人"), ("成人教育", "成人"), ("职业培训", "成人"),
-                    # 学历层次
-                    ("本科生", "大学"), ("本科", "大学"), ("专科生", "大学"), ("专科", "大学"),
-                    ("硕士研究生", "研究生"), ("博士研究生", "博士"),
-                    # 学习阶段描述
-                    ("初学", "入门"), ("入门", "入门"), ("基础", "入门"), ("初级", "入门"),
-                    ("中级", "中级"), ("高级", "高级"), ("专业", "高级"),
-                    # 幼儿园
-                    ("幼儿园", "幼儿园"), ("学前班", "学前班"), ("托儿所", "幼儿园")
-                ]
+        # 检查所有问题的答案中是否包含年级信息
+        grade_keywords = {
+            "一年级": ["一年级", "1年级", "小学一年级", "小一"],
+            "二年级": ["二年级", "2年级", "小学二年级", "小二"],
+            "三年级": ["三年级", "3年级", "小学三年级", "小三"],
+            "四年级": ["四年级", "4年级", "小学四年级", "小四"],
+            "五年级": ["五年级", "5年级", "小学五年级", "小五"],
+            "六年级": ["六年级", "6年级", "小学六年级", "小六"],
+            "七年级": ["七年级", "7年级", "初一", "初中一年级"],
+            "八年级": ["八年级", "8年级", "初二", "初中二年级"],
+            "九年级": ["九年级", "9年级", "初三", "初中三年级"],
+            "高一": ["高一", "高中一年级", "十年级", "10年级"],
+            "高二": ["高二", "高中二年级", "十一年级", "11年级"],
+            "高三": ["高三", "高中三年级", "十二年级", "12年级"],
+            "大一": ["大一", "大学一年级", "本科一年级"],
+            "大二": ["大二", "大学二年级", "本科二年级"],
+            "大三": ["大三", "大学三年级", "本科三年级"],
+            "大四": ["大四", "大学四年级", "本科四年级"],
+            "幼儿园": ["幼儿园", "学前班", "幼儿", "学前教育"]
+        }
 
+        # 检查所有收集的数据
+        for key, value in collected_data.items():
+            if value and isinstance(value, str):
                 value_lower = value.lower()
-                for pattern, grade in grade_patterns:
-                    if pattern in value_lower:
+                for grade, keywords in grade_keywords.items():
+                    if any(keyword.lower() in value_lower for keyword in keywords):
                         return grade
 
         return ""
@@ -353,7 +368,7 @@ class TeachingService:
             "allows_free_text": config['allows_free_text']
         }
 
-    def _save_lesson_plan(self, user_id: int, collected_data: Dict[str, Any], lesson_plan_data: Dict[str, Any]) -> LessonPlan:
+    async def _save_lesson_plan(self, user_id: int, collected_data: Dict[str, Any], lesson_plan_data: Dict[str, Any]) -> LessonPlan:
         """
         保存教学计划到数据库
 
@@ -367,7 +382,7 @@ class TeachingService:
         """
         try:
             # 智能提取学科和年级信息
-            subject = self._extract_subject_from_collected_data(collected_data)
+            subject = await self._extract_subject_from_collected_data(collected_data)
             grade = self._extract_grade_from_collected_data(collected_data)
             
             # 创建教案
@@ -592,7 +607,7 @@ class TeachingService:
 
         if lesson_plan_data:
             # 保存教案到数据库
-            lesson_plan = self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
+            lesson_plan = await self._save_lesson_plan(session.user_id, session.collected_data, lesson_plan_data)
             session.lesson_plan_id = lesson_plan.id
             session.status = SessionStatus.completed
             self.db.commit()
