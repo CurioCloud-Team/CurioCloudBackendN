@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     
     # LandPPT集成配置
     landppt_base_url: str = "http://localhost:8001"
-    landppt_api_key: Optional[str] = None
+    landppt_api_key: Optional[str] = "curio_cloud_integration_key_2024"
     landppt_default_scenario: str = "education"
     
     class Config:
