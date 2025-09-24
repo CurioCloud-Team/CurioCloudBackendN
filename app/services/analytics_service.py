@@ -22,7 +22,8 @@ class AnalyticsService:
             # 处理潜在的空文件或只有表头的文件
             if df.empty:
                 raise HTTPException(status_code=400, detail="Excel文件为空或无法解析。")
-            file_content_text = df.to_csv(index=False)
+            # 仅使用前5行数据让AI分析结构
+            file_content_text = df.head(5).to_csv(index=False)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"无法读取或转换Excel文件: {e}")
 
