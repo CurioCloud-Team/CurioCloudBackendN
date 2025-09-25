@@ -1,0 +1,40 @@
+@jwt_token = ""
+@analysis_id = ""
+
+###
+# 1. 用户登录获取Token
+# 请将 "your_test_user" 和 "your_test_password" 替换为您的测试用户名和密码
+POST http://127.0.0.1:8000/api/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=testuser&password=testpassword
+
+> {%
+    client.global.set("jwt_token", response.body.access_token);
+%}
+
+###
+# 2. 上传成绩Excel文件进行分析
+# !!重要!!
+# 请确保您已在项目根目录下创建了 `sample_grades.xlsx` 文件。
+#
+POST http://127.0.0.1:8000/api/analytics/upload_grades
+Authorization: Bearer {{jwt_token}}
+Content-Type: multipart/form-data; boundary=----WebAppBoundary
+
+------WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample_grades.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ./sample_grades.xlsx
+------WebAppBoundary--
+
+> {%
+    client.global.set("analysis_id", response.body.analysis_id);
+%}
+
+###
+# 3. 获取学情分析报告
+# 这个请求会自动使用上一步返回的 analysis_id
+GET http://127.0.0.1:8000/api/analytics/report/{{analysis_id}}
+Authorization: Bearer {{jwt_token}}

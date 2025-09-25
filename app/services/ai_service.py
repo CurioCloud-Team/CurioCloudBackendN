@@ -516,6 +516,92 @@ class AIService:
         
         return ""
 
+    async def generate_text(
+        self,
+        prompt: str,
+        use_gemini: bool = False,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        is_json_output: bool = True
+    ) -> Optional[str]:
+        """
+        通用的文本生成方法
+
+        Args:
+            prompt: 发送给AI的提示
+            use_gemini: 是否强制使用Gemini模型
+            model: 指定要使用的模型，如果为None则使用默认模型
+            temperature: 控制生成文本的随机性
+            max_tokens: 生成文本的最大长度
+            is_json_output: AI是否应该返回JSON格式的字符串
+
+        Returns:
+            AI生成的文本内容字符串，如果失败则返回None
+        """
+        if model is None:
+            model = "google/gemini-pro-1.5" if use_gemini else self.default_model
+
+        messages = [{"role": "user", "content": prompt}]
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        
+        if is_json_output:
+            payload["response_format"] = {"type": "json_object"}
+
+        response_data = await self._make_api_call(payload)
+
+        if response_data and response_data.get("choices"):
+            content = response_data["choices"][0]["message"]["content"]
+            return content
+        
+        return None
+
+    async def generate_lesson_plan_from_scratch(
+        self,
+        subject: str,
+        grade: str,
+        topic: str,
+        duration_minutes: int,
+        teaching_method: str = "传统教学",
+        student_level: str = "中等",
+        special_requirements: str = "",
+        enable_web_search: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """
+        从零开始生成教学计划
+
+        Args:
+            subject: 学科
+            grade: 年级
+            topic: 课题
+            duration_minutes: 课程时长（分钟）
+            teaching_method: 教学方法偏好
+            student_level: 学生水平
+            special_requirements: 特殊要求
+            enable_web_search: 是否启用联网搜索
+
+        Returns:
+            生成的教学计划字典，如果失败返回None
+        """
+        lesson_data = {
+            "subject": subject,
+            "grade": grade,
+            "topic": topic,
+            "duration_minutes": duration_minutes,
+            "teaching_method": teaching_method,
+            "student_level": student_level,
+            "special_requirements": special_requirements
+        }
+
+        return await self.generate_lesson_plan(lesson_data, enable_web_search)
+
+
     def _validate_lesson_plan(self, lesson_plan: Dict[str, Any]) -> Dict[str, Any]:
         """
         验证AI生成的教学计划格式
