@@ -179,3 +179,17 @@ class ExerciseService:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"保存题目时出错: {e}")
+
+    def get_exercises_by_lesson_plan_id(self, lesson_plan_id: int) -> list[Question]:
+        """
+        根据教案ID获取所有练习题
+        """
+        # 首先检查教案是否存在
+        lesson_plan = self.db.query(LessonPlan).filter(LessonPlan.id == lesson_plan_id).first()
+        if not lesson_plan:
+            raise HTTPException(status_code=404, detail="未找到指定的教案")
+
+        # 查询与该教案关联的所有问题
+        questions = self.db.query(Question).filter(Question.lesson_plan_id == lesson_plan_id).all()
+        
+        return questions

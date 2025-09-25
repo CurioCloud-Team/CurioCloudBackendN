@@ -83,3 +83,16 @@ async def generate_short_answer_questions(
         difficulty=request.difficulty.value,
     )
     return questions
+
+@router.get("/lesson-plan/{plan_id}", response_model=List[QuestionSchema])
+def get_exercises_for_lesson_plan(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取指定教案的所有练习题
+    """
+    service = ExerciseService(db)
+    questions = service.get_exercises_by_lesson_plan_id(lesson_plan_id=plan_id)
+    return questions
