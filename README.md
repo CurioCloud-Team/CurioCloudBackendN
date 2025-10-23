@@ -1,6 +1,6 @@
 # CurioCloud Backend
 
-基于FastAPI的用户认证系统，支持用户注册和登录功能。
+基于 FastAPI 的 课研云 CurioCloud 后端。
 
 ## 项目概述
 课研云 CurioCloud 旨在打造一款AI驱动的教师备课辅助系统，通过集成先进的人工智能技术，解决传统备课方式效率低、创新性不足的痛点。项目旨在实现教学设计的自动化、教学资源的智能化生成与个性化推荐、以及深度的学情分析，从而革命性地提升教师的备课效率与教学质量。
@@ -16,7 +16,7 @@
 - ✅ RESTful API设计
 - ✅ 完整的文档和注释
 - ✅ 完善的测试套件
-- 🆕 **对话式教学设计自动化模块**
+- ✅ **对话式教学设计自动化模块**
   - 智能对话流程引导
   - AI生成教学计划
   - OpenRouter集成
@@ -261,7 +261,7 @@ Authorization: Bearer {access_token}
 }
 ```
 
-## 🆕 对话式教学设计模块
+## 对话式教学设计模块
 
 ### 功能概述
 
@@ -422,14 +422,6 @@ openrouter_base_url=https://openrouter.ai/api/v1
 openrouter_default_model=google/gemini-2.5-flash
 llm_max_retries=3
 llm_timeout_seconds=120
-```
-
-### 演示脚本
-
-运行演示脚本来了解模块功能：
-
-```bash
-python demo_teaching_module.py
 ```
 
 ## 密码要求
