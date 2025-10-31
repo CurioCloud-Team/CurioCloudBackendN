@@ -69,25 +69,25 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  deploy:
-    name: Update remote Docker host
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    env:
-      IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-      IMAGE_REPO: ${{ needs.build-and-push.outputs.image_repo }}
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.REMOTE_SSH_KEY }}
-          port: ${{ secrets.REMOTE_PORT }}
-          script: |
-            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            docker pull ${IMAGE_REPO}:${IMAGE_TAG}
-            docker ps -q --filter "name=${{ secrets.DOCKER_CONTAINER_NAME }}" | grep -q "." && docker stop ${{ secrets.DOCKER_CONTAINER_NAME }} || true
-            docker rm ${{ secrets.DOCKER_CONTAINER_NAME }} 2>/dev/null || true
-            docker run -d --name ${{ secrets.DOCKER_CONTAINER_NAME }} --restart always -p 8000:8000 ${IMAGE_REPO}:${IMAGE_TAG}
+  # deploy:
+  #   name: Update remote Docker host
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   env:
+  #     IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+  #     IMAGE_REPO: ${{ needs.build-and-push.outputs.image_repo }}
+  #   steps:
+  #     - name: Deploy via SSH
+  #       uses: appleboy/ssh-action@v1.0.3
+  #       with:
+  #         host: ${{ secrets.REMOTE_HOST }}
+  #         username: ${{ secrets.REMOTE_USER }}
+  #         key: ${{ secrets.REMOTE_SSH_KEY }}
+  #         port: ${{ secrets.REMOTE_PORT }}
+  #         script: |
+  #           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+  #           docker pull ${IMAGE_REPO}:${IMAGE_TAG}
+  #           docker ps -q --filter "name=${{ secrets.DOCKER_CONTAINER_NAME }}" | grep -q "." && docker stop ${{ secrets.DOCKER_CONTAINER_NAME }} || true
+  #           docker rm ${{ secrets.DOCKER_CONTAINER_NAME }} 2>/dev/null || true
+  #           docker run -d --name ${{ secrets.DOCKER_CONTAINER_NAME }} --restart always -p 8000:8000 ${IMAGE_REPO}:${IMAGE_TAG}

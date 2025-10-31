@@ -1,5 +1,5 @@
 fastapi
-unicorn
+uvicorn
 sqlalchemy
 pydantic_settings
 jose
